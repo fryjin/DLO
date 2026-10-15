@@ -432,3 +432,28 @@ button:disabled{cursor:not-allowed}
   .sidebar-account-popover{bottom:calc(100% + 8px);left:0}
   .sidebar-avatar{width:36px;height:36px;flex-basis:36px}
 }
+
+
+/* Cloud Lite V1.0.4 — Keep sticky table headers inside their scrollports.
+   On outer-page scrolling Chrome can composite sticky <th> over adjacent
+   sticky toolbars. Paint containment prevents header bleed while preserving
+   vertical/horizontal scrolling and sticky headings inside each table. */
+#costView .cost-manager,
+#pricingView .products-block,
+#pricingView .fees-block,
+#pricingView .summary-block {
+  isolation: isolate;
+  contain: paint;
+}
+#costView .cost-manager .table-scroll,
+#pricingView .table-scroll,
+#pricingView .summary-scroll {
+  position: relative;
+  isolation: isolate;
+  contain: paint;
+}
+#costView > .toolbar,
+#pricingView > .toolbar {
+  background: #fff;
+  isolation: isolate;
+}
