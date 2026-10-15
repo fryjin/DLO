@@ -1,0 +1,10 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "dopamine-cloud-lite",
+  "main": "./src/worker.js",
+  "compatibility_date": "2026-10-15",
+  "assets": {"directory":"./dist","binding":"ASSETS","run_worker_first":true},
+  "d1_databases": [
+    {"binding":"DB","database_name":"dopamine-cloud-lite","database_id":"REPLACE_WITH_YOUR_D1_DATABASE_ID","migrations_dir":"migrations"}
+  ]
+}

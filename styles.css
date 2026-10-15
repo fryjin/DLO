@@ -1,0 +1,292 @@
+
+:root{
+  --bg:#f5f7fb;
+  --panel:#ffffff;
+  --panel-soft:#f8fafc;
+  --line:#e3e7ef;
+  --line-strong:#d2d8e4;
+  --text:#1f2937;
+  --muted:#667085;
+  --muted-2:#98a2b3;
+  --primary:#4f5fd5;
+  --primary-dark:#3f4ec0;
+  --primary-soft:#eef1ff;
+  --calc:#f3f6fb;
+  --profit:#217a4a;
+  --loss:#c9362b;
+  --warning:#a15c00;
+  --danger:#d92d20;
+  --danger-soft:#fff1f0;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg)}
+body{font-family:Inter,"PingFang SC","Microsoft YaHei",Arial,sans-serif;color:var(--text);font-size:13px}
+button,input,select{font:inherit}
+button{cursor:pointer}
+.app{min-height:100vh}
+.topbar{
+  height:58px;background:#fff;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;padding:0 18px;
+  position:sticky;top:0;z-index:50;
+}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-mark{width:28px;height:28px;border-radius:8px;background:var(--primary);color:#fff;display:grid;place-items:center;font-weight:800}
+.brand-title{font-weight:750}
+.brand-subtitle{font-size:11px;color:var(--muted)}
+.top-actions{display:flex;align-items:center;gap:8px}
+.save-state{font-size:12px;color:var(--warning);min-width:84px;text-align:right}
+.btn{
+  border:1px solid var(--line-strong);background:#fff;color:var(--text);
+  padding:8px 12px;border-radius:7px;line-height:1.15;
+}
+.btn:hover{background:#f7f8fb}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.primary:hover{background:var(--primary-dark)}
+.btn.ghost{color:var(--muted)}
+.btn.danger-light{color:var(--danger);border-color:#f0cbc7}
+.content{padding:0 15px 30px;min-width:920px}
+.page-head{
+  min-height:62px;display:flex;align-items:center;justify-content:space-between;
+  margin:0;background:var(--bg);position:sticky;top:58px;z-index:45;
+  padding:10px 0 8px;
+}
+.title-row{display:flex;align-items:center;gap:14px}
+h1{font-size:18px;margin:0}
+.tabs{display:flex;gap:4px;background:#e9edf4;padding:4px;border-radius:9px}
+.tab{border:0;background:transparent;color:var(--muted);padding:8px 14px;border-radius:7px;font-weight:650}
+.tab.active{background:#fff;color:var(--text);box-shadow:0 1px 4px rgba(16,24,40,.08)}
+.legend,.block-note,.toolbar-help{font-size:12px;color:var(--muted)}
+.view{display:none}
+.view.active{display:block}
+.toolbar{
+  background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  position:sticky;top:120px;z-index:44;
+  box-shadow:0 4px 14px rgba(16,24,40,.055);
+}
+.toolbar-left,.toolbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.inline-field{display:flex;align-items:center;gap:7px;color:var(--muted)}
+input,select{
+  min-height:32px;border:1px solid var(--line-strong);border-radius:6px;background:#fff;
+  color:var(--text);padding:5px 8px;outline:none;
+}
+input:focus,select:focus{border-color:#9aa5ef;box-shadow:0 0 0 3px rgba(79,95,213,.10)}
+.package-select{min-width:180px;font-weight:650}
+.worksheet{display:grid;grid-template-rows:clamp(760px,90vh,1200px) clamp(460px,56vh,660px) clamp(560px,68vh,840px);gap:12px;margin-top:10px}
+.block{
+  background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;
+  display:flex;flex-direction:column;min-height:0;box-shadow:0 2px 8px rgba(16,24,40,.025);
+}
+.block-head{height:42px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid var(--line)}
+.block-title{display:flex;align-items:center;gap:8px;font-weight:750}
+.step{width:21px;height:21px;border-radius:6px;background:var(--primary-soft);color:var(--primary);display:grid;place-items:center;font-size:11px;font-weight:800}
+.table-scroll,.summary-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:auto}
+table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%}
+th,td{
+  height:36px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:0;white-space:nowrap;background:#fff;
+}
+th{
+  position:sticky;top:0;z-index:6;background:#f8fafc;color:#475467;
+  font-weight:700;text-align:center;padding:0 8px;
+}
+.cell-input,.cell-select{width:100%;height:35px;border:0;border-radius:0;background:transparent;padding:0 8px}
+.cell-input:focus,.cell-select:focus{box-shadow:inset 0 0 0 2px #9aa5ef}
+.cell{
+  height:35px;display:flex;align-items:center;justify-content:flex-end;
+  padding:0 9px;font-variant-numeric:tabular-nums;
+}
+.center{justify-content:center}
+.auto{background:var(--calc)}
+.pos{color:var(--profit);font-weight:650}
+.neg{color:var(--loss);font-weight:650}
+.row-actions{display:none}
+.inline-add{border:0;background:transparent;color:var(--primary);font-weight:650;padding:6px 8px;border-radius:6px}
+.inline-add:hover{background:var(--primary-soft)}
+.delete-icon{
+  border:0;background:transparent;color:var(--muted-2);
+  width:26px;height:26px;border-radius:5px;font-size:18px;line-height:1;
+}
+.delete-icon:hover{color:var(--danger);background:var(--danger-soft)}
+
+.rank{width:46px;min-width:46px}
+.product-col{width:150px;min-width:150px}
+.qty-col{width:72px;min-width:72px}
+.money-col{width:108px;min-width:108px}
+.profit-col{width:118px;min-width:118px}
+.compact-action{width:42px;min-width:42px}
+.discount-group{background:#f2f4ff!important;color:#3f4ec0}
+.discount-sub{background:#f7f8ff!important}
+.rate-editor{display:flex;align-items:center;justify-content:center;gap:4px}
+.rate-editor input{width:54px;height:26px;text-align:center;padding:2px 4px}
+.sticky{position:sticky;z-index:4}
+th.sticky{z-index:9}
+.s0{left:0}.s1{left:46px}.s2{left:196px}.s3{left:268px}.s4{left:376px}.s5{left:484px}.s6{left:592px;box-shadow:5px 0 10px -8px rgba(16,24,40,.45)}
+
+.fee-table{width:100%;min-width:820px}
+.fee-name{width:270px}.fee-type{width:190px}.fee-value{width:190px}.fee-result{width:210px}
+.inline-value{height:35px;display:flex;align-items:center}
+.inline-value span{color:var(--muted);padding:0 7px}
+.inline-value input{flex:1;min-width:0}
+
+.summary-table{min-width:100%}
+.summary-label{min-width:190px;text-align:left;padding-left:14px;font-weight:650;background:#fbfcfd}
+.summary-value{min-width:150px;text-align:right;padding:0 12px;font-variant-numeric:tabular-nums}
+.summary-original{background:#f4f6f9!important}
+.summary-discount{background:#f2f4ff!important;color:#3f4ec0}
+.summary-highlight td{background:#f7f8ff;font-weight:700}
+.summary-profit td{font-size:14px;font-weight:800}
+.summary-note{padding:8px 12px;border-top:1px solid var(--line);background:#fbfcfd;color:var(--muted);font-size:12px}
+
+.cost-manager{height:clamp(420px,68vh,720px);margin-top:10px}
+.cost-table{width:100%;min-width:1020px}
+.cost-name{width:125px}.cost-components{width:210px}.cost-component-qty{width:105px}.cost-spec{width:175px}.cost-value{width:105px}.cost-list-price{width:105px}.cost-profit{width:105px}.cost-status{width:82px}
+.cost-row-combo td{vertical-align:top}
+.component-stack,.component-qty-stack{padding:5px 6px;display:flex;flex-direction:column;gap:5px}
+.component-line{display:flex;align-items:center;gap:5px;min-height:30px}
+.component-line select{flex:1;min-width:0;height:30px}
+.component-line input{width:100%;height:30px}
+.component-remove{width:24px;height:24px;border:0;background:transparent;color:var(--muted-2);font-size:16px;border-radius:5px}
+.component-remove:hover{color:var(--danger);background:var(--danger-soft)}
+.component-add{align-self:flex-start;border:0;background:transparent;color:var(--primary);padding:4px 3px;font-weight:650}
+.component-add:hover{text-decoration:underline}
+.cost-kind{font-size:10px;color:var(--primary);background:var(--primary-soft);border-radius:999px;padding:2px 6px;margin-left:6px;vertical-align:middle}
+.combo-cost{background:var(--calc)}
+.slash-cell{color:var(--muted-2);text-align:center}
+
+
+.empty-cell{padding:28px!important;text-align:center;color:var(--muted)}
+.toast{
+  position:fixed;right:18px;bottom:18px;background:#182230;color:#fff;
+  padding:10px 14px;border-radius:8px;box-shadow:0 8px 28px rgba(25,33,61,.16);
+  opacity:0;transform:translateY(8px);pointer-events:none;transition:.18s ease;z-index:100;
+}
+.toast.show{opacity:1;transform:translateY(0)}
+@media(max-width:1100px){
+  .content{padding:0 10px 28px;min-width:900px}
+  .worksheet{grid-template-rows:clamp(720px,88vh,1040px) clamp(440px,54vh,600px) clamp(540px,66vh,760px)}
+}
+@media(max-height:820px){
+  .worksheet{grid-template-rows:760px 460px 580px}
+  .cost-manager{height:480px}
+  .page-head{min-height:54px;padding:7px 0 6px}
+  .toolbar{top:112px;padding:8px 10px}
+}
+@media(max-height:700px){
+  .worksheet{grid-template-rows:680px 420px 520px}
+  .cost-manager{height:420px}
+}
+
+
+/* V4: compact laptop layout — keep discount comparison visible on the first screen. */
+@media(max-width:1500px){
+  body{font-size:12px}
+  th{padding:0 4px}
+  .rank{width:36px;min-width:36px}
+  .product-col{width:110px;min-width:110px}
+  .qty-col{width:60px;min-width:60px}
+  .money-col{width:78px;min-width:78px}
+  .profit-col{width:92px;min-width:92px}
+  .compact-action{width:34px;min-width:34px}
+
+  .s0{left:0}
+  .s1{left:36px}
+  .s2{left:146px}
+  .s3{left:206px}
+  .s4{left:284px}
+  .s5{left:362px}
+  .s6{left:440px}
+
+  .cell{padding:0 5px}
+  .cell-input,.cell-select{padding:0 5px}
+  .rate-editor{gap:2px}
+  .rate-editor input{width:45px}
+}
+
+@media(max-width:1250px){
+  .content{min-width:860px}
+  .rank{width:32px;min-width:32px}
+  .product-col{width:100px;min-width:100px}
+  .qty-col{width:56px;min-width:56px}
+  .money-col{width:72px;min-width:72px}
+  .profit-col{width:86px;min-width:86px}
+
+  .s0{left:0}
+  .s1{left:32px}
+  .s2{left:132px}
+  .s3{left:188px}
+  .s4{left:260px}
+  .s5{left:332px}
+  .s6{left:404px}
+}
+
+
+
+/* V5 factory table compact */
+.cost-table .rank{width:38px;min-width:38px}
+.cost-table .compact-action{width:40px;min-width:40px}
+.cost-table th{padding-left:5px;padding-right:5px}
+.cost-table .cell{padding-left:5px;padding-right:5px}
+.cost-table .cell-input,
+.cost-table .cell-select{padding-left:5px;padding-right:5px}
+.cost-table .component-stack,
+.cost-table .component-qty-stack{padding-left:4px;padding-right:4px}
+@media(max-width:1500px){
+  .cost-table{min-width:990px}
+  .cost-name{width:115px}
+  .cost-components{width:195px}
+  .cost-component-qty{width:96px}
+  .cost-spec{width:160px}
+  .cost-value{width:96px}
+  .cost-list-price,.cost-profit{width:100px}
+  .cost-status{width:76px}
+}
+
+
+/* V6 project switcher + batch clipboard */
+.project-controls{display:flex;align-items:center;gap:5px;padding:3px 5px;background:#fff;border:1px solid var(--line);border-radius:8px}
+.project-label{font-size:12px;color:var(--muted);padding-left:3px}
+.project-select{min-width:140px;max-width:220px;height:30px;min-height:30px;font-weight:650}
+.mini-btn{height:30px;border:1px solid var(--line-strong);background:#fff;border-radius:6px;padding:0 8px;color:var(--text);font-size:12px}
+.mini-btn:hover{background:#f7f8fb}
+.mini-btn.danger-text{color:var(--danger)}
+.modal-backdrop{position:fixed;inset:0;background:rgba(16,24,40,.32);display:grid;place-items:center;z-index:200;padding:20px}
+.modal-backdrop[hidden]{display:none}
+.modal-card{width:min(760px,94vw);max-height:82vh;background:#fff;border-radius:12px;box-shadow:0 24px 70px rgba(16,24,40,.24);display:flex;flex-direction:column;overflow:hidden}
+.modal-head{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--line)}
+.modal-title{font-size:16px;font-weight:750}
+.modal-hint{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.55}
+.modal-close{width:30px;height:30px;border:0;background:transparent;color:var(--muted);font-size:22px;border-radius:6px}
+.modal-close:hover{background:#f2f4f7;color:var(--text)}
+.modal-body{padding:14px 18px;overflow:auto}
+.batch-type-row{display:flex;align-items:center;gap:8px;color:var(--muted);margin-bottom:10px}
+.batch-type-row select{min-width:150px}
+.batch-text{width:100%;height:310px;resize:vertical;border:1px solid var(--line-strong);border-radius:8px;padding:10px 12px;font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;outline:none;white-space:pre;overflow:auto}
+.batch-text:focus{border-color:#9aa5ef;box-shadow:0 0 0 3px rgba(79,95,213,.10)}
+.batch-help{margin-top:7px;font-size:12px;color:var(--muted)}
+.modal-actions{padding:12px 18px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.modal-actions-right{display:flex;gap:8px}
+@media(max-width:1450px){
+  .legend{display:none}
+  .title-row{gap:8px}
+  .project-select{min-width:120px;max-width:160px}
+  .mini-btn{padding:0 6px}
+}
+@media(max-width:1100px){
+  .project-controls{gap:3px}
+  .project-label{display:none}
+  .project-select{min-width:105px;max-width:130px}
+  .mini-btn{font-size:11px;padding:0 5px}
+}
+
+/* V6 final: import diagnostics + compact project controls */
+.batch-error{padding:9px 11px;margin-top:9px;border:1px solid #f2c4c0;background:#fff4f3;color:#b42318;border-radius:7px;white-space:pre-wrap;line-height:1.45}
+.batch-error[hidden]{display:none}
+@media(max-width:1500px){.page-head .title-row{flex-wrap:wrap}.project-controls{flex-wrap:wrap}}
+
+/* V7: additional price/profit columns and single-column paste target */
+.batch-paste-options{display:flex;align-items:center;gap:12px;margin:0 0 10px;flex-wrap:wrap}
+.batch-paste-options label{display:flex;align-items:center;gap:7px;color:var(--muted)}
+.batch-paste-options select{min-width:146px}
+.batch-paste-options label[hidden]{display:none}
+.cost-list-price,.cost-profit{min-width:95px}
