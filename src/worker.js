@@ -119,21 +119,64 @@ async function logout(request,env) {
   }
   return respond({ok:true},200,{'set-cookie':cookieHeader('',true)});
 }
-async function getState(env) {
-  const row=await env.DB.prepare("SELECT data_json,version,updated_at,updated_by FROM shared_document WHERE id='main'").first();
-  return respond({ok:true,state:row?.data_json?JSON.parse(row.data_json):null,revision:row?.version||0,updatedAt:row?.updated_at||null,updatedBy:row?.updated_by||null});
+// All account data lives in ONE table; every account has ONE independent row.
+// GET may read another account; all writes are derived from the authenticated session.
+const ACCOUNT_IDS = Object.freeze(['admin01','admin02','admin03']);
+function selectAccount(name) {
+  const canonical=canonicalUsername(name);
+  return ACCOUNT_IDS.includes(canonical)?canonical:null;
+}
+async function getDocumentRow(env,username) {
+  return env.DB.prepare(`SELECT d.data_json,d.version,d.updated_at,d.updated_by
+      FROM account_documents AS d JOIN users AS u ON u.id=d.user_id
+      WHERE u.username=? AND u.enabled=1`).bind(username).first();
+}
+async function getState(request,env,user) {
+  const url=new URL(request.url);
+  const requested=url.searchParams.get('owner');
+  const owner=requested===null?user.username:selectAccount(requested);
+  if(!owner) return fail(400,'INVALID_OWNER','无效的数据空间');
+  const row=await getDocumentRow(env,owner);
+  if(!row) return fail(503,'MIGRATION_REQUIRED','账号数据尚未初始化，请先执行 V1.0.2 数据库迁移');
+  return respond({ok:true,owner,displayName:ACCOUNT_LABELS[owner],editable:owner===user.username,
+    state:row.data_json?JSON.parse(row.data_json):null,revision:row.version||0,
+    updatedAt:row.updated_at||null,updatedBy:row.updated_by||null});
 }
 async function putState(request,env,user) {
+  // A client must not turn this endpoint into a write-to-other-account API.
+  const url=new URL(request.url);
+  if(url.searchParams.has('owner')) return fail(403,'READ_ONLY','只能修改自己的数据');
   let body;
   try {body=await readJSON(request);} catch(e) {return fail(e.message==='PAYLOAD_TOO_LARGE'?413:400,e.message,'数据格式无效或过大');}
+  if(body?.owner && body.owner!==user.username) return fail(403,'READ_ONLY','只能修改自己的数据');
   if (!checkDocument(body?.state)) return fail(400,'INVALID_STATE','项目数据校验未通过');
   const raw=JSON.stringify(body.state);
-  if (te.encode(raw).length>MAX_DOCUMENT_BYTES) return fail(413,'PAYLOAD_TOO_LARGE','数据超过当前免费方案允许的大小');
+  if (te.encode(raw).length>MAX_DOCUMENT_BYTES) return fail(413,'PAYLOAD_TOO_LARGE','数据超过当前允许的大小');
   const now=Date.now();
-  // Explicit whole-document Last-Write-Wins. Atomic UPDATE gives a server-issued revision.
-  const row=await env.DB.prepare(`UPDATE shared_document SET data_json=?,version=version+1,updated_at=?,updated_by=? WHERE id='main' RETURNING version,updated_at,updated_by`)
-    .bind(raw,now,user.username).first();
-  return respond({ok:true,revision:row.version,updatedAt:row.updated_at,updatedBy:row.updated_by});
+  const row=await env.DB.prepare(`UPDATE account_documents SET data_json=?,version=version+1,
+    updated_at=?,updated_by=? WHERE user_id=? RETURNING version,updated_at,updated_by`)
+    .bind(raw,now,user.username,user.id).first();
+  if(!row) return fail(503,'MIGRATION_REQUIRED','账号数据未初始化，请先执行 V1.0.2 数据库迁移');
+  return respond({ok:true,owner:user.username,revision:row.version,updatedAt:row.updated_at,updatedBy:row.updated_by});
+}
+async function copyOtherToMine(request,env,user) {
+  let body;
+  try {body=await readJSON(request,2500);} catch {return fail(400,'INVALID_INPUT','同步参数格式无效');}
+  const source=selectAccount(body?.source);
+  if(!source || source===user.username) return fail(400,'INVALID_SOURCE','请选择其他账号的数据');
+  // The source data is read and copied inside ONE atomic SQLite statement.
+  // Only the logged-in user's row can be updated. This never writes to source.
+  const now=Date.now();
+  const row=await env.DB.prepare(`UPDATE account_documents
+    SET data_json=(SELECT src.data_json FROM account_documents AS src JOIN users AS su ON su.id=src.user_id WHERE su.username=? AND su.enabled=1),
+        version=version+1,updated_at=?,updated_by=?
+    WHERE user_id=? AND EXISTS(
+       SELECT 1 FROM account_documents AS src JOIN users AS su ON su.id=src.user_id
+       WHERE su.username=? AND su.enabled=1 AND src.data_json IS NOT NULL
+    ) RETURNING version,updated_at,updated_by`)
+    .bind(source,now,user.username,user.id,source).first();
+  if(!row) return fail(409,'SOURCE_UNAVAILABLE','对方暂无可同步的已保存数据，或你的账号尚未完成迁移');
+  return respond({ok:true,owner:user.username,source,revision:row.version,updatedAt:row.updated_at,updatedBy:row.updated_by});
 }
 function sameOriginPost(request) {
   const origin=request.headers.get('origin');
@@ -151,8 +194,9 @@ async function api(request,env) {
   const user=await auth(request,env);
   if (!user) return fail(401,'UNAUTHORIZED','请先登录');
   if (path==='/api/me' && method==='GET') return respond({ok:true,user:publicUser(user)});
-  if (path==='/api/state' && method==='GET') return getState(env);
+  if (path==='/api/state' && method==='GET') return getState(request,env,user);
   if (path==='/api/state' && method==='POST') return putState(request,env,user);
+  if (path==='/api/state/sync' && method==='POST') return copyOtherToMine(request,env,user);
   return fail(404,'NOT_FOUND','接口不存在');
 }
 export default {

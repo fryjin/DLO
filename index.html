@@ -5,7 +5,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <meta content="Dopamine 套餐售价、成本、折扣与利润计算工具" name="description"/>
-<title>Dopamine Cloud Lite · 协作工作台</title>
+<title>Dopamine Cloud Lite · 独立数据空间</title>
 <link href="./styles.css" rel="stylesheet"/>
 <link href="./v8.css" rel="stylesheet"/></head>
 <body class="auth-checking">
@@ -17,7 +17,7 @@
 </div>
 <div class="sidebar-project"><span class="sidebar-eyebrow">当前工作空间</span>
 <div class="sidebar-project-title"><svg aria-hidden="true" fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24" width="18"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3V7Z"></path></svg><span id="sidebarProjectName">复古红系列</span></div>
-<div class="sidebar-project-description">共享数据 · 三账号协作</div>
+<div class="sidebar-project-description">账号独立 · 可查看与复制</div>
 </div>
 <nav aria-label="主要功能" class="sidebar-nav">
 <div class="sidebar-group-label">经营工具</div>
@@ -28,7 +28,7 @@
 <div class="nav-future"><svg aria-hidden="true" fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24" width="18"><path d="M9 6h12M9 12h12M9 18h12M3 6h.01M3 12h.01M3 18h.01"></path></svg><span>记账与报表</span></div>
 </nav>
 <div class="sidebar-bottom">
-<div class="storage-dot"></div><div class="sidebar-bottom-copy"><strong>云端共享模式</strong><span>Worker + D1 · 三账号同步</span></div>
+<div class="storage-dot"></div><div class="sidebar-bottom-copy"><strong>云端独立数据空间</strong><span>Worker + D1 · 数据相互隔离</span></div>
 </div>
 </aside><div class="workspace"><div class="app">
 <header class="topbar">
@@ -36,7 +36,7 @@
 <div class="brand-mark">D</div>
 <div>
 <div class="brand-title">Dopamine</div>
-<div class="brand-subtitle">Cloud Lite · V1.0.1</div>
+<div class="brand-subtitle">Cloud Lite · V1.0.2.1</div>
 </div>
 </div><div class="project-controls header-project-controls">
 <span class="project-label">项目</span>
@@ -49,7 +49,15 @@
 <div class="mobile-view-nav" aria-label="小屏页面切换">
 <button class="mobile-view-tab" data-view="cost" type="button">产品信息</button>
 <button class="mobile-view-tab" data-view="pricing" type="button">套餐计算</button>
-</div><div class="top-actions">
+</div><div class="data-space-controls" aria-label="账号数据空间">
+  <span class="data-space-label">数据空间</span>
+  <select class="data-space-select" id="viewOwnerSelect" aria-label="选择要查看的账号数据空间" disabled>
+    <option value="admin01">炮台</option><option value="admin02">芋头</option><option value="admin03">EE</option>
+  </select>
+  <span class="data-space-readonly" id="spaceBadge" hidden>只读</span>
+  <button class="btn data-space-copy" type="button" id="copyFromOwnerBtn" hidden>同步到我的数据</button>
+</div>
+<div class="top-actions">
 <span class="save-state" id="saveState"></span><details class="dropdown" id="dataMenu"><summary class="btn data-menu-btn">数据管理 <svg aria-hidden="true" fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24" width="18"><path d="m9 18 6-6-6-6"></path></svg></summary><div class="dropdown-menu"><div class="dropdown-title">备份与恢复</div><button class="menu-action" id="backupBtn">导出备份</button><button class="menu-action" id="restoreBtn">恢复备份</button></div></details><input accept=".json,application/json" hidden="" id="restoreInput" type="file"/>
 
 
@@ -59,7 +67,7 @@
 </div>
 </header>
 <main class="content">
-<div class="page-head"><div class="page-top-marker"><span class="preview-dot"></span> Cloud Lite · 云端共享工作台</div>
+<div class="page-head"><div class="page-top-marker"><span class="preview-dot"></span> Cloud Lite · 独立数据空间 · 可只读查看他人数据</div>
 <div class="title-row">
 <div class="page-kicker">工作台 <span class="slash">/</span> <span id="breadcrumbCurrent">产品管理</span></div><h1 id="viewTitle">产品信息设置</h1><p class="page-subtitle" id="viewSubtitle">维护产品、组合与基础定价，成本变化自动传递到套餐。</p>
 
@@ -240,9 +248,22 @@
     <label>登录密钥<input id="loginSecret" name="password" type="password" autocomplete="current-password" placeholder="输入专属高强度密钥" required /></label>
     <div class="auth-error" id="authError" role="alert"></div>
     <button class="btn primary auth-submit" id="loginSubmit" type="submit">登录</button>
-    <small>登录后所有账号读取和编辑同一份云端数据。</small>
+    <small>账号数据独立保存；可只读查看其他账号，并确认后复制到自己名下。</small>
   </form>
 </div>
+<div class="account-sync-confirm" id="copyConfirmDialog" hidden>
+  <div class="account-sync-panel" role="dialog" aria-modal="true" aria-labelledby="syncConfirmTitle" aria-describedby="syncConfirmDescription">
+    <div class="sync-warning-icon" aria-hidden="true">!</div>
+    <h3 id="syncConfirmTitle">确认覆盖我的全部数据？</h3>
+    <p id="syncConfirmDescription">此操作会把 <strong id="syncSourceName"></strong> 已保存的全部项目、产品、组合、套餐和定价数据，复制到 <strong id="syncTargetName"></strong> 的数据空间。</p>
+    <p class="sync-danger-text">你自己的当前云端数据会被完整覆盖，无法在页面中直接撤销。对方的数据不会改变。建议先切换回自己的空间导出 JSON 备份。</p>
+    <div class="account-sync-actions">
+      <button class="btn" id="cancelCopyBtn" type="button">取消</button>
+      <button class="btn danger-confirm" id="confirmCopyBtn" type="button">确认覆盖并同步</button>
+    </div>
+  </div>
+</div>
+<div class="space-loading-overlay" id="spaceBusy" role="status" aria-live="polite" hidden>正在切换或同步数据空间…</div>
 <div class="auth-exit" id="exitDialog" hidden>
   <div class="auth-exit-panel" role="dialog" aria-modal="true" aria-labelledby="exitTitle">
     <h3 id="exitTitle">退出登录</h3><p>当前有未保存的修改，请选择如何处理。</p>

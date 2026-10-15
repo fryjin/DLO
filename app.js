@@ -185,9 +185,13 @@
   let lastSyncAt = 0;
   let pendingRemote = null;
   let currentUsername = null;
+  let viewOwner = null;
+  let spaceSwitching = false;
+  let viewLoadToken = 0;
   const FRIENDLY_NAMES = Object.freeze({admin01:'炮台',admin02:'芋头',admin03:'EE'});
   function showAccount(user) {
     currentUsername=user.username; // canonical identifier for local view preferences
+    viewOwner=user.username;
     $('currentUserLabel').textContent=user.displayName || FRIENDLY_NAMES[user.username] || user.username;
   }
   function finishStartup() {
@@ -208,21 +212,57 @@
     return body;
   }
 
+  function isOtherSpace() {return Boolean(currentUsername && viewOwner && viewOwner!==currentUsername);}
+  function accountLabel(username) {return FRIENDLY_NAMES[username] || username || '未知';}
+  const accountNames=['admin01','admin02','admin03'];
+  function updateSpaceControls(){
+    const other=isOtherSpace();
+    const selector=$('viewOwnerSelect');
+    selector.innerHTML=accountNames.map(name=>`<option value="${name}">${escapeHtml(accountLabel(name))}${name===currentUsername?'（我的）':''}</option>`).join('');
+    selector.value=viewOwner || currentUsername || 'admin01';
+    selector.disabled=spaceSwitching || !loaded;
+    $('spaceBadge').hidden=!other;
+    $('spaceBadge').textContent=other?`${accountLabel(viewOwner)}的数据 · 只读`:'';
+    $('copyFromOwnerBtn').hidden=!other;
+    $('copyFromOwnerBtn').disabled=spaceSwitching || saving;
+    $('syncNowBtn').textContent=other?'刷新查看':'同步最新';
+    document.body.classList.toggle('viewing-other-space',other);
+    document.body.classList.toggle('space-is-loading',spaceSwitching);
+    $('spaceBusy').hidden=!spaceSwitching;
+    // The UI explicitly disables ALL write controls in viewed account space.
+    // Account ownership restrictions are ALSO enforced on the Worker API.
+    const allowed=new Set(['productSearch','productFilter']);
+    document.querySelectorAll('#pricingView input, #pricingView select, #pricingView button, #costView input, #costView select, #costView button').forEach(el=>{
+      if(el.classList.contains('combo-toggle') || allowed.has(el.id)) return;
+      el.disabled=other;
+    });
+    const mutatingIds=['saveBtn','resetBtn','restoreBtn','newProjectBtn','copyProjectBtn','renameProjectBtn',
+      'deleteProjectBtn','newPackageBtn','copyPackageBtn','renamePackageBtn','deletePackageBtn',
+      'batchCostBtn','batchPricingBtn','addCostItemBtn','addComboItemBtn','addProductBtn',
+      'addFeeBtn','addDiscountBtn'];
+    for(const id of mutatingIds) if($(id))$(id).disabled=other;
+    // Viewing other people permits browsing their projects and exporting JSON.
+  }
+
   function updateSaveState(failed = false) {
     const label=$('saveState');
-    if(failed) label.textContent='云端保存失败 · 请导出备份';
+    if(isOtherSpace()) label.textContent='只读浏览 · 不会修改对方数据';
+    else if(failed) label.textContent='云端保存失败 · 请导出备份';
     else if(saving) label.textContent='保存云端中…';
     else if(dirty) label.textContent='有未保存的修改';
     else if(lastSavedAt){
       const hhmm=new Date(lastSavedAt).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false});
       label.textContent=(lastSaveKind==='manual'?'已保存':'已自动保存')+' '+hhmm;
     } else label.textContent=loaded?'云端数据已就绪':'云端连接中…';
-    label.title='每5分钟自动保存修改，并获取云端最新版本。多人同时编辑采用最后一次保存覆盖。';
+    label.title=isOtherSpace()?'当前只读，可以同步覆盖自己的数据。':'每5分钟自动保存自己的修改，并获取当前数据空间的最新版本。';
   }
-  function markDirty() {dirty=true;changeId++;updateSaveState();}
+  function markDirty() {
+    if(isOtherSpace()) throw new Error('只读数据空间禁止修改');
+    dirty=true;changeId++;updateSaveState();
+  }
 
   async function persist(kind='manual') {
-    if(!loaded || saving)return false;
+    if(!loaded || saving || spaceSwitching || isOtherSpace())return false;
     if(!dirty && kind!=='manual')return true;
     saving=true;updateSaveState();
     const snapshot=clone(state);
@@ -258,8 +298,10 @@
     renderAll();
   }
   async function refreshRemote() {
-    if(!loaded)return;
-    const latest=await requestAPI('state');
+    if(!loaded || spaceSwitching)return;
+    const activeOwner=viewOwner;
+    const latest=await requestAPI('state?owner='+encodeURIComponent(activeOwner));
+    if(activeOwner!==viewOwner || spaceSwitching)return;
     lastSyncAt=Date.now();
     if(latest.revision<=cloudRevision){pendingRemote=null;return;}
     // Do not destroy an actively edited field with a background repaint.
@@ -271,12 +313,12 @@
     if(latest.state)applyCloudSnapshot(latest.state);
     cloudRevision=latest.revision;
     pendingRemote=null;
-    toast('已同步其他账号的最新数据');
+    toast('已获取当前账号数据的最新版本');
     updateSaveState();
   }
   async function syncCycle() {
-    if(!loaded || saving)return;
-    if(dirty){
+    if(!loaded || saving || spaceSwitching)return;
+    if(dirty && !isOtherSpace()){
       const success=await persist('auto');
       if(!success)return;
     }
@@ -292,7 +334,7 @@
     window.addEventListener('pageshow',resumed);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)resumed();});
     document.addEventListener('focusout',()=>{
-      if(pendingRemote && !dirty && !saving){
+      if(pendingRemote && !dirty && !saving && !spaceSwitching){
         const newest=pendingRemote;pendingRemote=null;
         if(newest.revision>cloudRevision){
           if(newest.state)applyCloudSnapshot(newest.state);
@@ -303,12 +345,88 @@
     });
   }
 
+  async function openDataSpace(owner) {
+    if(!loaded || spaceSwitching)return;
+    if(!accountNames.includes(owner))return;
+    if(owner===viewOwner)return;
+    if(dirty){
+      toast('请先保存或取消自己的未保存修改，再切换数据空间');
+      $('viewOwnerSelect').value=viewOwner;
+      return;
+    }
+    if(saving){toast('请等待当前保存结束');$('viewOwnerSelect').value=viewOwner;return;}
+    const prev=viewOwner;
+    const token=++viewLoadToken;
+    spaceSwitching=true;updateSpaceControls();
+    try{
+      const latest=await requestAPI('state?owner='+encodeURIComponent(owner));
+      if(token!==viewLoadToken)return;
+      pendingRemote=null;
+      viewOwner=owner;
+      cloudRevision=latest.revision;
+      if(latest.state)applyCloudSnapshot(latest.state);
+      else {state=defaultState();savedState=clone(state);restoreView();dirty=false;renderAll();}
+      lastSyncAt=Date.now();
+      updateSaveState();updateSpaceControls();
+    }catch(error){
+      viewOwner=prev;
+      toast('切换失败：'+error.message);
+    }finally{
+      if(token===viewLoadToken){spaceSwitching=false;updateSpaceControls();}
+    }
+  }
+
+  function showSyncConfirm() {
+    if(!isOtherSpace() || spaceSwitching || saving)return;
+    $('syncSourceName').textContent=accountLabel(viewOwner);
+    $('syncTargetName').textContent=accountLabel(currentUsername);
+    $('copyConfirmDialog').hidden=false;
+  }
+  async function copyViewedToMySpace() {
+    if(!isOtherSpace() || spaceSwitching || saving)return;
+    const from=viewOwner;
+    $('confirmCopyBtn').disabled=true;
+    $('confirmCopyBtn').textContent='同步中…';
+    spaceSwitching=true;updateSpaceControls();
+    try{
+      await requestAPI('state/sync',{method:'POST',body:JSON.stringify({source:from})});
+      $('copyConfirmDialog').hidden=true;
+      // Do not take the edited in-memory preview as the result: reload the
+      // server's atomically committed copy from the current user's own row.
+      const latest=await requestAPI('state?owner='+encodeURIComponent(currentUsername));
+      viewOwner=currentUsername;
+      cloudRevision=latest.revision;
+      pendingRemote=null;
+      if(latest.state)applyCloudSnapshot(latest.state);
+      else throw new Error('同步后未找到数据，请刷新页面');
+      lastSyncAt=Date.now();lastSavedAt=Date.now();lastSaveKind='manual';
+      toast(`已将${accountLabel(from)}的数据覆盖同步到我的空间`);
+    }catch(error){
+      // If the commit worked but the follow-up read failed, do not silently
+      // leave a stale local editing snapshot. Read it again before editing.
+      toast('同步结果需要核对：'+error.message);
+      try {
+        const latest=await requestAPI('state?owner='+encodeURIComponent(currentUsername));
+        viewOwner=currentUsername;
+        cloudRevision=latest.revision;
+        if(latest.state)applyCloudSnapshot(latest.state);
+        $('copyConfirmDialog').hidden=true;
+      }catch{}
+    }finally{
+      spaceSwitching=false;
+      $('confirmCopyBtn').disabled=false;
+      $('confirmCopyBtn').textContent='确认覆盖并同步';
+      updateSaveState();updateSpaceControls();
+    }
+  }
+
   async function hydrateCloud() {
-    const latest=await requestAPI('state');
+    const latest=await requestAPI('state?owner='+encodeURIComponent(currentUsername));
+    viewOwner=currentUsername;
     cloudRevision=latest.revision;
     if(latest.state)applyCloudSnapshot(latest.state);
     else {state=defaultState();savedState=clone(state);restoreView();dirty=false;renderAll();}
-    loaded=true;lastSyncAt=Date.now();updateSaveState();
+    loaded=true;lastSyncAt=Date.now();updateSaveState();updateSpaceControls();
     $('authGate').hidden=true;
   }
   async function bootstrapCloud() {
@@ -326,13 +444,14 @@
   async function doLogout(){
     try{await requestAPI('logout',{method:'POST',body:'{}'});}
     catch(error){toast('退出失败，请重试：'+error.message);return;}
-    currentUsername=null;loaded=false;dirty=false;
+    currentUsername=null;viewOwner=null;loaded=false;dirty=false;pendingRemote=null;
     state=defaultState();savedState=clone(state);cloudRevision=0;
     $('exitDialog').hidden=true;
     $('loginSecret').value='';
     $('currentUserLabel').textContent='';
     $('authGate').hidden=false;
-    updateSaveState();
+    $('copyConfirmDialog').hidden=true;
+    updateSaveState();updateSpaceControls();
   }
 
   function toast(message) {
@@ -344,7 +463,7 @@
   }
 
   // Private view preferences: changing dropdowns does not modify shared business data.
-  function viewPrefKey() {return 'dopamine-cloud-view-'+(currentUsername || 'guest');}
+  function viewPrefKey() {return 'dopamine-cloud-view-'+(currentUsername || 'guest')+'-'+(viewOwner || 'self');}
   function rememberView() {
     if(!currentUsername)return;
     try {
@@ -959,6 +1078,7 @@
         markDirty(); renderAll();
       };
     });
+    updateSpaceControls();
   }
 
 
@@ -1423,6 +1543,7 @@
     updateSaveState();
     renderV8Context();
     enableVerticalScrollHandoff();
+    updateSpaceControls();
   }
 
   function renderV8Context() {
@@ -1677,6 +1798,10 @@
   };
 
   $('saveBtn').onclick = () => {void persist('manual');};
+  $('viewOwnerSelect').onchange=e=>{void openDataSpace(e.currentTarget.value);};
+  $('copyFromOwnerBtn').onclick=showSyncConfirm;
+  $('cancelCopyBtn').onclick=()=>{$('copyConfirmDialog').hidden=true;};
+  $('confirmCopyBtn').onclick=()=>{void copyViewedToMySpace();};
 
   $('resetBtn').onclick = () => {
     if (!dirty) return;
@@ -1692,7 +1817,7 @@
     const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `Dopamine_Pricing_Backup_${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `Dopamine_${accountLabel(viewOwner)}_Backup_${new Date().toISOString().slice(0,10)}.json`;
     a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
   };
@@ -1743,7 +1868,7 @@
   window.addEventListener('beforeunload', e => {
     // Browsers cannot render an async custom confirm dialog during tab close.
     // We only show the native unsaved-changes warning; NEVER silently save.
-    if (!dirty) return;
+    if (!dirty || isOtherSpace()) return;
     e.preventDefault();
     e.returnValue = '';
   });
@@ -1764,6 +1889,7 @@
     finally{btn.disabled=false;btn.textContent='登录';}
   };
   $('syncNowBtn').onclick=async()=>{
+    if(spaceSwitching)return;
     if(dirty && !confirm('当前有未保存修改，是否先保存再同步？'))return;
     if(dirty && !(await persist('manual')))return;
     try{await refreshRemote();toast('已检查云端最新数据');}catch(error){toast('同步失败：'+error.message);}

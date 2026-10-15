@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS account_documents (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, data_json TEXT, version INTEGER NOT NULL DEFAULT 0, updated_at INTEGER, updated_by TEXT);
+INSERT OR IGNORE INTO account_documents(user_id,data_json,version,updated_at,updated_by) SELECT u.id, legacy.data_json, legacy.version, legacy.updated_at, legacy.updated_by FROM users AS u CROSS JOIN shared_document AS legacy WHERE legacy.id='main' AND u.username IN ('admin01','admin02','admin03');
