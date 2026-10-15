@@ -192,7 +192,12 @@
   function showAccount(user) {
     currentUsername=user.username; // canonical identifier for local view preferences
     viewOwner=user.username;
-    $('currentUserLabel').textContent=user.displayName || FRIENDLY_NAMES[user.username] || user.username;
+    const name=user.displayName || FRIENDLY_NAMES[user.username] || user.username;
+    $('currentUserLabel').textContent=name;
+    $('accountMenuName').textContent=name;
+    $('currentUserAvatar').textContent=({admin01:'炮',admin02:'芋',admin03:'EE'})[user.username] || name.slice(0,2);
+    $('accountMenuTrigger').setAttribute('aria-label',`当前账号：${name}，点击查看账号菜单`);
+    $('accountMenuTrigger').title=`${name} · 账号菜单`;
   }
   function finishStartup() {
     // Reveal login or workspace only once the session check has settled.
@@ -225,7 +230,6 @@
     $('spaceBadge').textContent=other?`${accountLabel(viewOwner)}的数据 · 只读`:'';
     $('copyFromOwnerBtn').hidden=!other;
     $('copyFromOwnerBtn').disabled=spaceSwitching || saving;
-    $('syncNowBtn').textContent=other?'刷新查看':'同步最新';
     document.body.classList.toggle('viewing-other-space',other);
     document.body.classList.toggle('space-is-loading',spaceSwitching);
     $('spaceBusy').hidden=!spaceSwitching;
@@ -236,7 +240,7 @@
       if(el.classList.contains('combo-toggle') || allowed.has(el.id)) return;
       el.disabled=other;
     });
-    const mutatingIds=['saveBtn','resetBtn','restoreBtn','newProjectBtn','copyProjectBtn','renameProjectBtn',
+    const mutatingIds=['saveBtn','restoreBtn','newProjectBtn','copyProjectBtn','renameProjectBtn',
       'deleteProjectBtn','newPackageBtn','copyPackageBtn','renamePackageBtn','deletePackageBtn',
       'batchCostBtn','batchPricingBtn','addCostItemBtn','addComboItemBtn','addProductBtn',
       'addFeeBtn','addDiscountBtn'];
@@ -350,7 +354,7 @@
     if(!accountNames.includes(owner))return;
     if(owner===viewOwner)return;
     if(dirty){
-      toast('请先保存或取消自己的未保存修改，再切换数据空间');
+      toast('请先保存当前修改，再切换数据空间');
       $('viewOwnerSelect').value=viewOwner;
       return;
     }
@@ -448,7 +452,11 @@
     state=defaultState();savedState=clone(state);cloudRevision=0;
     $('exitDialog').hidden=true;
     $('loginSecret').value='';
-    $('currentUserLabel').textContent='';
+    $('currentUserLabel').textContent='当前账号';
+    $('accountMenuName').textContent='当前账号';
+    $('currentUserAvatar').textContent='?';
+    $('accountMenuTrigger').setAttribute('aria-label','当前登录账号，点击查看账号菜单');
+    $('accountMenu').open=false;
     $('authGate').hidden=false;
     $('copyConfirmDialog').hidden=true;
     updateSaveState();updateSpaceControls();
@@ -1803,16 +1811,6 @@
   $('cancelCopyBtn').onclick=()=>{$('copyConfirmDialog').hidden=true;};
   $('confirmCopyBtn').onclick=()=>{void copyViewedToMySpace();};
 
-  $('resetBtn').onclick = () => {
-    if (!dirty) return;
-    if (!confirm('放弃当前未保存的修改？')) return;
-    state = clone(savedState);
-    restoreView();
-    dirty = false;
-    renderAll();
-    toast('已恢复到上次保存状态');
-  };
-
   $('backupBtn').onclick = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
     const a = document.createElement('a');
@@ -1888,13 +1886,8 @@
     }catch(error){$('authError').textContent=error.message;}
     finally{btn.disabled=false;btn.textContent='登录';}
   };
-  $('syncNowBtn').onclick=async()=>{
-    if(spaceSwitching)return;
-    if(dirty && !confirm('当前有未保存修改，是否先保存再同步？'))return;
-    if(dirty && !(await persist('manual')))return;
-    try{await refreshRemote();toast('已检查云端最新数据');}catch(error){toast('同步失败：'+error.message);}
-  };
   $('logoutBtn').onclick=()=>{
+    $('accountMenu').open=false;
     if(dirty)$('exitDialog').hidden=false;
     else void doLogout();
   };

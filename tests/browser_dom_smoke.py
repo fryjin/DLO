@@ -58,6 +58,15 @@ with sync_playwright() as pw:
   page.locator('#authLoading').wait_for(state='hidden')
   page.locator('#authGate').wait_for(state='hidden')
   assert page.locator('#currentUserLabel').inner_text()=='炮台'
+  assert page.locator('#currentUserAvatar').inner_text()=='炮'
+  assert page.locator('#resetBtn').count()==0
+  assert page.locator('#syncNowBtn').count()==0
+  assert page.locator('#logoutBtn').count()==1
+  assert page.locator('#accountMenu').is_visible()
+  page.locator('#accountMenuTrigger').click()
+  assert page.locator('#accountMenu').get_attribute('open') is not None
+  assert page.locator('#accountMenuName').inner_text()=='炮台'
+  page.locator('#accountMenuTrigger').click()
   # Before UI-level account switch: each of three accounts must be independent.
   page.locator('#addCostItemBtn').click()
   page.locator('.cost-name-input').first.fill('炮台的产品')
@@ -98,6 +107,19 @@ with sync_playwright() as pw:
   page.wait_for_function('window.__cloudMock.saves.length===2')
   assert page.evaluate('window.__cloudMock.docs.admin01.state.projects[0].costItems[0].name')=='炮台再次修改'
   assert page.evaluate('window.__cloudMock.docs.admin02.state.projects[0].costItems[0].name')=='芋头的产品'
+  # Avatar-menu logout preserves the unsaved confirmation behavior.
+  page.locator('.cost-name-input').first.fill('尚未保存的内容')
+  page.locator('#accountMenuTrigger').click()
+  page.locator('#logoutBtn').click()
+  assert page.locator('#exitDialog').is_visible()
+  page.locator('#exitCancel').click()
+  assert page.locator('#exitDialog').is_hidden()
+  assert page.locator('.cost-name-input').first.input_value()=='尚未保存的内容'
+  page.locator('#accountMenuTrigger').click()
+  page.locator('#logoutBtn').click()
+  page.locator('#exitDiscard').click()
+  page.locator('#authGate').wait_for(state='visible')
+  assert page.locator('#currentUserAvatar').inner_text()=='?'
   assert not errors,errors
-  print('Browser smoke PASS: flicker-free, user-owned saving, read-only viewing, cancel & confirm copy, independent revisions')
+  print('Browser smoke PASS: account avatar, no obsolete buttons, isolated saves, read-only, sync confirm, logout confirmation')
   browser.close()

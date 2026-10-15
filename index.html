@@ -28,7 +28,18 @@
 <div class="nav-future"><svg aria-hidden="true" fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24" width="18"><path d="M9 6h12M9 12h12M9 18h12M3 6h.01M3 12h.01M3 18h.01"></path></svg><span>记账与报表</span></div>
 </nav>
 <div class="sidebar-bottom">
-<div class="storage-dot"></div><div class="sidebar-bottom-copy"><strong>云端独立数据空间</strong><span>Worker + D1 · 数据相互隔离</span></div>
+  <details class="sidebar-account dropdown" id="accountMenu">
+    <summary id="accountMenuTrigger" title="当前登录账号" aria-label="当前登录账号，点击查看账号菜单">
+      <span class="sidebar-avatar" id="currentUserAvatar" aria-hidden="true">?</span>
+      <span class="sidebar-account-copy"><strong id="currentUserLabel">当前账号</strong><span>个人数据空间</span></span>
+      <svg class="sidebar-account-chevron" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m7 10 5 5 5-5"/></svg>
+    </summary>
+    <div class="sidebar-account-popover">
+      <div class="sidebar-account-popover-name" id="accountMenuName">当前账号</div>
+      <div class="sidebar-account-popover-sub">已登录 · 独立数据空间</div>
+      <button class="sidebar-account-logout" id="logoutBtn" type="button">退出登录</button>
+    </div>
+  </details>
 </div>
 </aside><div class="workspace"><div class="app">
 <header class="topbar">
@@ -36,7 +47,7 @@
 <div class="brand-mark">D</div>
 <div>
 <div class="brand-title">Dopamine</div>
-<div class="brand-subtitle">Cloud Lite · V1.0.2.1</div>
+<div class="brand-subtitle">Cloud Lite · V1.0.3</div>
 </div>
 </div><div class="project-controls header-project-controls">
 <span class="project-label">项目</span>
@@ -62,8 +73,7 @@
 
 
 
-<button class="btn" id="resetBtn">取消修改</button>
-<button class="btn" id="syncNowBtn" type="button">同步最新</button><span id="currentUserLabel" class="cloud-username"></span><button class="btn primary" id="saveBtn">保存</button><button class="btn" id="logoutBtn" type="button">退出登录</button>
+<button class="btn primary" id="saveBtn">保存</button>
 </div>
 </header>
 <main class="content">

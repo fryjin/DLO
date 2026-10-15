@@ -393,3 +393,42 @@ button:disabled{cursor:not-allowed}
   .mobile-view-nav{order:0}
   .top-actions{order:2;flex:1 1 100%;justify-content:flex-end;margin-left:0}
 }
+
+
+/* V1.0.3 — account entry at bottom-left; topbar simplified. */
+.sidebar-bottom{padding:10px 12px;min-height:68px}
+.sidebar-account{width:100%;min-width:0}
+.sidebar-account>summary{display:flex;align-items:center;justify-content:flex-start;gap:10px;min-height:46px;padding:5px 6px;border-radius:10px;color:#5b667b;list-style:none}
+.sidebar-account>summary::-webkit-details-marker{display:none}
+.sidebar-account>summary:hover,.sidebar-account[open]>summary{background:#f5f6fc}
+.sidebar-avatar{width:35px;height:35px;flex:0 0 35px;border-radius:50%;display:grid;place-items:center;background:#edf0ff;color:#4555c5;border:1px solid #dde3ff;font-size:13px;font-weight:750;letter-spacing:-.03em}
+.sidebar-account-copy{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1;text-align:left}
+.sidebar-account-copy strong{font-size:12px;color:#38435a;font-weight:740;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sidebar-account-copy span{font-size:10px;color:#9aa4b5;white-space:nowrap}
+.sidebar-account-chevron{color:#9fa9bb;flex:none}
+.sidebar-account-popover{position:absolute;z-index:100;bottom:calc(100% + 9px);left:0;width:212px;border:1px solid #e2e7f1;border-radius:12px;background:#fff;padding:13px;box-shadow:0 14px 40px rgba(35,46,85,.16)}
+.sidebar-account-popover-name{font-size:13px;font-weight:750;color:#2d374d}
+.sidebar-account-popover-sub{font-size:11px;color:#98a3b4;margin:4px 0 13px}
+.sidebar-account-logout{display:block;width:100%;border:1px solid #e5e9f2;background:#fafbfe;border-radius:8px;padding:10px 12px;font-size:12px;text-align:left;color:#59677d;font-weight:650}
+.sidebar-account-logout:hover{background:#f2f4fb;border-color:#ccd3e1;color:#34436a}
+@media(min-width:1201px) and (max-width:1600px), (min-width:1601px){
+  .sidebar-manual-collapse .sidebar-account-copy,.sidebar-manual-collapse .sidebar-account-chevron{display:none}
+  .sidebar-manual-collapse .sidebar-bottom{padding:10px 6px}
+  .sidebar-manual-collapse .sidebar-account>summary{justify-content:center;padding:4px}
+}
+@media (min-width:1201px) and (max-width:1600px){
+  .sidebar-bottom{padding:11px 7px;justify-content:center}
+  .sidebar-account>summary{padding:4px;justify-content:center;min-height:46px}
+  .sidebar-account-copy,.sidebar-account-chevron{display:none}
+  .sidebar-account-popover{left:2px}
+}
+@media(max-width:1200px){
+  /* The regular side rail is hidden here; keep the account entry reachable at bottom-left. */
+  .sidebar{display:flex;position:fixed;left:10px;bottom:10px;top:auto;width:48px;min-width:48px;height:48px;border:0;background:transparent;z-index:75}
+  .sidebar-head,.sidebar-nav,.sidebar-project{display:none!important}
+  .sidebar-bottom{display:flex;min-height:48px;padding:0;border:0;background:transparent;justify-content:center}
+  .sidebar-account>summary{width:48px;height:48px;min-height:48px;border-radius:50%;padding:5px;justify-content:center;background:#fff;border:1px solid #dfe5f0;box-shadow:0 5px 16px rgba(46,62,99,.13)}
+  .sidebar-account-copy,.sidebar-account-chevron{display:none!important}
+  .sidebar-account-popover{bottom:calc(100% + 8px);left:0}
+  .sidebar-avatar{width:36px;height:36px;flex-basis:36px}
+}
