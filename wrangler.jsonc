@@ -5,6 +5,6 @@
   "compatibility_date": "2026-10-15",
   "assets": {"directory":"./dist","binding":"ASSETS","run_worker_first":true},
   "d1_databases": [
-    {"binding":"DB","database_name":"dopamine-cloud-lite","database_id": "9f467214-282c-45af-b9bd-89637b7a61d9","migrations_dir":"migrations"}
+    {"binding":"DB","database_name":"dopamine-cloud-lite","database_id":"9f467214-282c-45af-b9bd-89637b7a61d9","migrations_dir":"migrations"}
   ]
 }

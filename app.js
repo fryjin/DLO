@@ -185,6 +185,16 @@
   let lastSyncAt = 0;
   let pendingRemote = null;
   let currentUsername = null;
+  const FRIENDLY_NAMES = Object.freeze({admin01:'炮台',admin02:'芋头',admin03:'EE'});
+  function showAccount(user) {
+    currentUsername=user.username; // canonical identifier for local view preferences
+    $('currentUserLabel').textContent=user.displayName || FRIENDLY_NAMES[user.username] || user.username;
+  }
+  function finishStartup() {
+    // Reveal login or workspace only once the session check has settled.
+    document.body.classList.remove('auth-checking');
+    $('authLoading').hidden=true;
+  }
 
   async function requestAPI(path, options={}) {
     const result = await fetch('/api/'+path, {
@@ -304,12 +314,13 @@
   async function bootstrapCloud() {
     try {
       const me=await requestAPI('me');
-      currentUsername=me.user.username;
+      showAccount(me.user);
       await hydrateCloud();
-      $('currentUserLabel').textContent=currentUsername;
     }catch(error){
       $('authGate').hidden=false;
       if(error.status!==401)$('authError').textContent=error.message;
+    }finally{
+      finishStartup();
     }
   }
   async function doLogout(){
@@ -1746,9 +1757,8 @@
     $('authError').textContent='';
     try{
       const response=await requestAPI('login',{method:'POST',body:JSON.stringify({username:$('loginUsername').value,secret:$('loginSecret').value})});
-      currentUsername=response.user.username;
+      showAccount(response.user);
       await hydrateCloud();
-      $('currentUserLabel').textContent=currentUsername;
       $('loginSecret').value='';
     }catch(error){$('authError').textContent=error.message;}
     finally{btn.disabled=false;btn.textContent='登录';}

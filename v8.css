@@ -340,3 +340,12 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
 .auth-exit-panel h3{margin:0 0 12px;font-size:18px}.auth-exit-panel p{color:#667085;line-height:1.6}.auth-exit-actions{display:flex;gap:7px;justify-content:flex-end;flex-wrap:wrap;margin-top:24px}
 
 .cloud-username{font-size:11px;color:#667085;white-space:nowrap}
+
+/* V1.0.1: keep the login screen invisible until /api/me has settled. */
+.auth-checking .auth-gate{visibility:hidden!important}
+.auth-loading{position:fixed;inset:0;z-index:12000;background:#f5f7fc;display:flex;align-items:center;justify-content:center;padding:20px}
+.auth-loading[hidden]{display:none}
+.auth-loading-panel{display:flex;align-items:center;flex-direction:column;gap:14px;text-align:center;color:#23283a}
+.auth-loading-panel strong{font-size:20px}
+.auth-loading-panel span{color:#667085;font-size:13px}
+.auth-panel select{width:100%;height:43px;padding:0 12px;font-size:14px;background:#fff;border:1px solid #d0d5dd;border-radius:6px;color:#23283a}

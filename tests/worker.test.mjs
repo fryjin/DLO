@@ -6,9 +6,10 @@ if (!globalThis.crypto) globalThis.crypto=webcrypto;
 
 const pepper=randomBytes(32).toString('hex');
 const secret=randomBytes(32).toString('base64url');
-const hash=createHmac('sha256',pepper).update('admin01:'+secret).digest('hex');
+const secrets={admin01:secret,admin02:randomBytes(32).toString('base64url'),admin03:randomBytes(32).toString('base64url')};
+const hashes=Object.fromEntries(Object.entries(secrets).map(([name,key])=>[name,createHmac('sha256',pepper).update(name+':'+key).digest('hex')]));
 function createDB(){
- const users=new Map([['admin01',{id:'fixed-account-1',username:'admin01',secret_hash:hash,enabled:1}]]);
+ const users=new Map(Object.keys(secrets).map((username,i)=>[username,{id:`fixed-account-${i+1}`,username,secret_hash:hashes[username],enabled:1}]));
  const sessions=new Map(), limits=new Map();
  let doc={data_json:null,version:0,updated_at:null,updated_by:null};
  return {prepare(sql){let binds=[];return {
@@ -58,4 +59,24 @@ test('rejects unauthenticated, invalid login, CSRF and grants identical access t
  assert.equal(update.revision,2);
  assert.equal((await worker.fetch(request('/api/logout','POST',{},header),env)).status,200);
  assert.equal((await worker.fetch(request('/api/state','GET',null,header),env)).status,401);
+});
+
+test('friendly account names reuse original three credentials and shared document',async()=>{
+ const table=[['炮台','admin01'],['芋头','admin02'],['EE','admin03']];
+ for(const [name,canonical] of table){
+   const login=await worker.fetch(request('/api/login','POST',{username:name,secret:secrets[canonical]}),env);
+   assert.equal(login.status,200,`failed alias ${name}`);
+   const body=await login.json();
+   assert.deepEqual(body.user,{username:canonical,displayName:name});
+   const cookie=login.headers.get('set-cookie').split(';')[0];
+   const me=await (await worker.fetch(request('/api/me','GET',null,cookie),env)).json();
+   assert.deepEqual(me.user,{username:canonical,displayName:name});
+   const data=await worker.fetch(request('/api/state','GET',null,cookie),env);
+   assert.equal(data.status,200);
+ }
+ const legacy=await worker.fetch(request('/api/login','POST',{username:'admin02',secret:secrets.admin02}),env);
+ assert.equal(legacy.status,200,'existing credentials must remain valid');
+ assert.equal((await legacy.json()).user.displayName,'芋头');
+ const wrong=await worker.fetch(request('/api/login','POST',{username:'EE',secret:secrets.admin01}),env);
+ assert.equal(wrong.status,401,'aliases must not grant other users credentials');
 });

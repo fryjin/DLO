@@ -3,6 +3,28 @@ const MAX_DOCUMENT_BYTES = 850_000;
 const SESSION_SECONDS = 7 * 24 * 3600;
 const LOGIN_WINDOW_MS = 15 * 60_000;
 const MAX_ATTEMPTS = 6;
+// Friendly login aliases; database identities and existing key hashes stay unchanged.
+// The hash was created from the canonical username, so aliases must resolve BEFORE verification.
+const ACCOUNT_ALIASES = Object.freeze({
+  '炮台': 'admin01',
+  '芋头': 'admin02',
+  'ee': 'admin03',
+  'admin1': 'admin01',
+  'admin2': 'admin02',
+  'admin3': 'admin03'
+});
+const ACCOUNT_LABELS = Object.freeze({
+  admin01: '炮台',
+  admin02: '芋头',
+  admin03: 'EE'
+});
+function canonicalUsername(name) {
+  const input=String(name||'').trim().toLowerCase();
+  return ACCOUNT_ALIASES[input] || input;
+}
+function publicUser(user) {
+  return {username:user.username, displayName:ACCOUNT_LABELS[user.username]||user.username};
+}
 
 function respond(data, status=200, extraHeaders={}) {
   return new Response(JSON.stringify(data), {
@@ -65,7 +87,7 @@ async function readJSON(request,maxBytes=MAX_DOCUMENT_BYTES) {
 async function login(request,env) {
   let body;
   try {body=await readJSON(request,2500);} catch {return fail(400,'INVALID_INPUT','账号或密钥格式不正确');}
-  const username=String(body?.username||'').trim().toLowerCase();
+  const username=canonicalUsername(body?.username);
   const secret=String(body?.secret||'');
   if (!/^[a-z0-9_-]{3,32}$/.test(username) || secret.length<24 || secret.length>256) return fail(401,'LOGIN_FAILED','账号或密钥不正确');
   if (!env.KEY_PEPPER || env.KEY_PEPPER.length<32) return fail(503,'SETUP_REQUIRED','尚未配置登录安全密钥');
@@ -88,7 +110,7 @@ async function login(request,env) {
   const token=randomToken();
   const tokenHash=await sha256(token);
   await env.DB.prepare('INSERT INTO sessions(token_hash,user_id,expires_at,created_at) VALUES(?,?,?,?)').bind(tokenHash,user.id,now+SESSION_SECONDS*1000,now).run();
-  return respond({ok:true,user:{username:user.username}},200,{'set-cookie':cookieHeader(token)});
+  return respond({ok:true,user:publicUser(user)},200,{'set-cookie':cookieHeader(token)});
 }
 async function logout(request,env) {
   const token=cookieValue(request,'dopamine_session');
@@ -128,7 +150,7 @@ async function api(request,env) {
   if (path==='/api/logout' && method==='POST') return logout(request,env);
   const user=await auth(request,env);
   if (!user) return fail(401,'UNAUTHORIZED','请先登录');
-  if (path==='/api/me' && method==='GET') return respond({ok:true,user:{username:user.username}});
+  if (path==='/api/me' && method==='GET') return respond({ok:true,user:publicUser(user)});
   if (path==='/api/state' && method==='GET') return getState(env);
   if (path==='/api/state' && method==='POST') return putState(request,env,user);
   return fail(404,'NOT_FOUND','接口不存在');

@@ -8,7 +8,7 @@
 <title>Dopamine Cloud Lite · 协作工作台</title>
 <link href="./styles.css" rel="stylesheet"/>
 <link href="./v8.css" rel="stylesheet"/></head>
-<body>
+<body class="auth-checking">
 <div class="shell"><aside class="sidebar" id="sidebar">
 <div class="sidebar-head">
 <div class="sidebar-logo">D</div>
@@ -36,7 +36,7 @@
 <div class="brand-mark">D</div>
 <div>
 <div class="brand-title">Dopamine</div>
-<div class="brand-subtitle">Cloud Lite · V1.0</div>
+<div class="brand-subtitle">Cloud Lite · V1.0.1</div>
 </div>
 </div><div class="project-controls header-project-controls">
 <span class="project-label">项目</span>
@@ -225,10 +225,18 @@
 </div>
 </div>
 </div>
+<div class="auth-loading" id="authLoading" role="status" aria-live="polite">
+  <div class="auth-loading-panel"><div class="auth-mark">D</div><strong>Dopamine Cloud Lite</strong><span>正在验证登录状态…</span></div>
+</div>
 <div class="auth-gate" id="authGate" aria-live="polite">
   <form class="auth-panel" id="loginForm">
     <div class="auth-mark">D</div><h2>Dopamine Cloud Lite</h2><p>共享成本与套餐定价 · 固定账号登录</p>
-    <label>账号<input id="loginUsername" name="username" autocomplete="username" placeholder="例如 admin01" required maxlength="32" /></label>
+    <label>账号<select id="loginUsername" name="username" autocomplete="username" required>
+      <option value="" selected disabled>请选择账号</option>
+      <option value="炮台">炮台</option>
+      <option value="芋头">芋头</option>
+      <option value="EE">EE</option>
+    </select></label>
     <label>登录密钥<input id="loginSecret" name="password" type="password" autocomplete="current-password" placeholder="输入专属高强度密钥" required /></label>
     <div class="auth-error" id="authError" role="alert"></div>
     <button class="btn primary auth-submit" id="loginSubmit" type="submit">登录</button>
