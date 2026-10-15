@@ -220,7 +220,10 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
 
 /* 1366x768: icon-rail, exact editing fields retained, discount columns still visible */
 @media(max-width:1600px){
-  :root{--sidebar-w:62px}
+  /* V1.0.5: The sticky title and toolbar are siblings, so the shared height
+     must live on :root, not just .page-head. Otherwise the toolbar uses
+     the old 98px value and leaves a gap where table headings show through. */
+  :root{--sidebar-w:62px;--subhead-h:88px}
   .sidebar{align-items:stretch}
   .sidebar-head{justify-content:center;padding:0}
   .sidebar-brand-copy,.sidebar-collapse,.sidebar-project,.sidebar-group-label,.sidebar-bottom-copy,.nav-item span,.nav-future span{display:none}
@@ -231,7 +234,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
   .topbar-brand{display:flex}
   .topbar{padding:0 19px}
   .content{padding:0 16px 30px}
-  .page-head{height:88px;min-height:88px;--subhead-h:88px}
+  .page-head{height:var(--subhead-h);min-height:var(--subhead-h)}
   .page-subtitle{display:none}
   .toolbar{gap:7px}
   .insight-item{margin-right:10px;padding-right:15px}
@@ -241,7 +244,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
   .cost-name{width:130px}.cost-components{width:164px}.cost-component-qty{width:70px}.cost-spec{width:118px}.cost-value{width:98px}.cost-list-price{width:98px}.cost-profit{width:96px}.cost-status{width:70px}
 }
 @media(max-width:1200px){
-  :root{--sidebar-w:0px}
+  :root{--sidebar-w:0px;--subhead-h:78px}
   .sidebar{display:none}
   .topbar-brand .brand-subtitle{display:none}
   .topbar{padding:0 13px}
@@ -249,7 +252,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
   .project-label{display:none}
   .project-select{min-width:126px;max-width:160px}
   .data-menu-btn{font-size:11px}
-  .page-head{height:78px;min-height:78px;--subhead-h:78px}
+  .page-head{height:var(--subhead-h);min-height:var(--subhead-h)}
   .tabs .tab{padding:8px 10px}
   .toolbar{flex-wrap:wrap;position:sticky;top:calc(var(--top-h) + var(--subhead-h))}
   .search-wrap{max-width:230px}
