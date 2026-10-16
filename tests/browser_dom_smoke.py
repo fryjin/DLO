@@ -62,6 +62,8 @@ with sync_playwright() as pw:
   assert page.locator('#resetBtn').count()==0
   assert page.locator('#syncNowBtn').count()==0
   assert page.locator('#logoutBtn').count()==1
+  assert page.locator('#saveBtn').is_visible()
+  assert page.locator('#dataMenu').is_visible()
   assert page.locator('#accountMenu').is_visible()
   page.locator('#accountMenuTrigger').click()
   assert page.locator('#accountMenu').get_attribute('open') is not None
@@ -75,13 +77,29 @@ with sync_playwright() as pw:
   assert page.evaluate('window.__cloudMock.docs.admin01.state.projects[0].costItems[0].name')=='炮台的产品'
   # Pre-populate a different owner's account data via a separate logical session.
   page.evaluate('''()=>{const s=JSON.parse(JSON.stringify(window.__cloudMock.docs.admin01.state));s.projects[0].costItems[0].name='芋头的产品';window.__cloudMock.docs.admin02={state:s,rev:2};}''')
+  # An already opened owner-only menu must close upon switching to read-only.
+  page.locator('#dataMenu summary').click()
+  assert page.locator('#dataMenu').get_attribute('open') is not None
   page.locator('#viewOwnerSelect').select_option('admin02')
   page.wait_for_function('document.querySelector("#spaceBadge").textContent.includes("芋头") && !document.querySelector("#spaceBusy").hidden===false')
   assert page.locator('.cost-name-input').first.input_value()=='芋头的产品'
   assert page.locator('.cost-name-input').first.is_disabled(), 'others must be read-only'
-  assert page.locator('#saveBtn').is_disabled()
+  assert page.locator('#saveBtn').is_hidden(), 'save must disappear in viewed space'
+  assert page.locator('#dataMenu').is_hidden(), 'data management must disappear in viewed space'
+  assert page.locator('#dataMenu').get_attribute('open') is None, 'menu must close on switch'
   assert page.locator('#restoreBtn').is_disabled()
-  assert page.locator('#backupBtn').is_enabled(), 'read-only backup must remain available'
+  # Even calling hidden action nodes programmatically must do nothing.
+  page.evaluate('''()=>{
+    window.__backupCalls=0;const old=URL.createObjectURL;
+    URL.createObjectURL=(...args)=>{window.__backupCalls++;return old.apply(URL,args)};
+    window.__restoreCalls=0;
+    const input=document.getElementById('restoreInput'),click=input.click.bind(input);
+    input.click=()=>{window.__restoreCalls++;};
+    document.getElementById('backupBtn').click();
+    document.getElementById('restoreBtn').click();
+  }''')
+  assert page.evaluate('window.__backupCalls')==0, 'must not export other data via hidden button'
+  assert page.evaluate('window.__restoreCalls')==0, 'must not trigger restore while viewing other data'
   assert page.locator('#projectSelect').is_enabled(), 'read-only browsing must remain available'
   assert page.locator('#copyFromOwnerBtn').is_visible()
   # View-only browse should not trigger saving, even if a forced timer fires.
@@ -96,7 +114,9 @@ with sync_playwright() as pw:
   page.locator('#copyFromOwnerBtn').click()
   page.locator('#confirmCopyBtn').click()
   page.wait_for_function('window.__cloudMock.copied.length===1')
-  page.wait_for_function('document.querySelector("#viewOwnerSelect").value==="admin01" && !document.querySelector("#saveBtn").disabled')
+  page.wait_for_function('document.querySelector("#viewOwnerSelect").value==="admin01" && !document.querySelector("#saveBtn").hidden')
+  assert page.locator('#saveBtn').is_visible()
+  assert page.locator('#dataMenu').is_visible()
   assert page.locator('.cost-name-input').first.input_value()=='芋头的产品'
   assert page.evaluate('window.__cloudMock.docs.admin01.state.projects[0].costItems[0].name')=='芋头的产品'
   assert page.evaluate('window.__cloudMock.docs.admin02.state.projects[0].costItems[0].name')=='芋头的产品'
@@ -121,5 +141,5 @@ with sync_playwright() as pw:
   page.locator('#authGate').wait_for(state='visible')
   assert page.locator('#currentUserAvatar').inner_text()=='?'
   assert not errors,errors
-  print('Browser smoke PASS: account avatar, no obsolete buttons, isolated saves, read-only, sync confirm, logout confirmation')
+  print('Browser smoke PASS: owner-only save+backup menu, hidden-action guards, account avatar, isolated saves, read-only, sync confirm, logout confirmation')
   browser.close()

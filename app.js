@@ -230,6 +230,11 @@
     $('spaceBadge').textContent=other?`${accountLabel(viewOwner)}的数据 · 只读`:'';
     $('copyFromOwnerBtn').hidden=!other;
     $('copyFromOwnerBtn').disabled=spaceSwitching || saving;
+    // Only the signed-in owner's data space can save, export, or restore.
+    // Hide the entire dropdown (not just its actions) in read-only mode.
+    $('saveBtn').hidden=other;
+    $('dataMenu').hidden=other;
+    if(other)$('dataMenu').open=false;
     document.body.classList.toggle('viewing-other-space',other);
     document.body.classList.toggle('space-is-loading',spaceSwitching);
     $('spaceBusy').hidden=!spaceSwitching;
@@ -245,7 +250,7 @@
       'batchCostBtn','batchPricingBtn','addCostItemBtn','addComboItemBtn','addProductBtn',
       'addFeeBtn','addDiscountBtn'];
     for(const id of mutatingIds) if($(id))$(id).disabled=other;
-    // Viewing other people permits browsing their projects and exporting JSON.
+    // Viewed account data is read-only, including no backup export/restore.
   }
 
   function updateSaveState(failed = false) {
@@ -1812,6 +1817,7 @@
   $('confirmCopyBtn').onclick=()=>{void copyViewedToMySpace();};
 
   $('backupBtn').onclick = () => {
+    if(!loaded || spaceSwitching || isOtherSpace())return;
     const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -1820,16 +1826,24 @@
     setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
   };
 
-  $('restoreBtn').onclick = () => $('restoreInput').click();
+  $('restoreBtn').onclick = () => {
+    if(!loaded || spaceSwitching || isOtherSpace())return;
+    $('restoreInput').click();
+  };
 
   $('restoreInput').onchange = async e => {
     const file = e.currentTarget.files?.[0];
     e.currentTarget.value = '';
-    if (!file) return;
+    if (!file || !loaded || spaceSwitching || isOtherSpace()) return;
+    // A file read is asynchronous: reject if the user has switched data
+    // spaces while it was in flight, even if the input was opened earlier.
+    const sourceOwner=viewOwner;
     try {
       const parsed = normalizeState(JSON.parse(await file.text()));
       if (!parsed) throw new Error('invalid');
+      if(sourceOwner!==viewOwner || spaceSwitching || isOtherSpace())return;
       if (!confirm('恢复备份会替换当前页面中的数据，是否继续？')) return;
+      if(sourceOwner!==viewOwner || spaceSwitching || isOtherSpace())return;
       state = parsed;
       if (!currentProject().packages.some(p => p.id === currentProject().currentPackageId)) currentProject().currentPackageId = currentProject().packages[0].id;
       markDirty();

@@ -460,3 +460,9 @@ button:disabled{cursor:not-allowed}
   background: #fff;
   isolation: isolate;
 }
+
+/* V1.0.6: saving and backup/restore are exclusive to the owner's space.
+   Both hidden attribute and the explicit read-only class prevent layout
+   rules for .dropdown/.btn from exposing the actions at any breakpoint. */
+#saveBtn[hidden],#dataMenu[hidden],
+.viewing-other-space #saveBtn,.viewing-other-space #dataMenu{display:none!important}
