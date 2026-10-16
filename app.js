@@ -240,7 +240,7 @@
     $('spaceBusy').hidden=!spaceSwitching;
     // The UI explicitly disables ALL write controls in viewed account space.
     // Account ownership restrictions are ALSO enforced on the Worker API.
-    const allowed=new Set(['productSearch','productFilter']);
+    const allowed=new Set(['productSearch','productFilter','packageSelect']);
     document.querySelectorAll('#pricingView input, #pricingView select, #pricingView button, #costView input, #costView select, #costView button').forEach(el=>{
       if(el.classList.contains('combo-toggle') || allowed.has(el.id)) return;
       el.disabled=other;
@@ -376,6 +376,7 @@
       if(latest.state)applyCloudSnapshot(latest.state);
       else {state=defaultState();savedState=clone(state);restoreView();dirty=false;renderAll();}
       lastSyncAt=Date.now();
+      rememberViewedOwner(); // Commit preference only after a successful space load.
       updateSaveState();updateSpaceControls();
     }catch(error){
       viewOwner=prev;
@@ -409,6 +410,7 @@
       if(latest.state)applyCloudSnapshot(latest.state);
       else throw new Error('同步后未找到数据，请刷新页面');
       lastSyncAt=Date.now();lastSavedAt=Date.now();lastSaveKind='manual';
+      rememberViewedOwner(); // Sync returns the user to their own editable space.
       toast(`已将${accountLabel(from)}的数据覆盖同步到我的空间`);
     }catch(error){
       // If the commit worked but the follow-up read failed, do not silently
@@ -419,6 +421,7 @@
         viewOwner=currentUsername;
         cloudRevision=latest.revision;
         if(latest.state)applyCloudSnapshot(latest.state);
+        rememberViewedOwner();
         $('copyConfirmDialog').hidden=true;
       }catch{}
     }finally{
@@ -430,11 +433,26 @@
   }
 
   async function hydrateCloud() {
-    const latest=await requestAPI('state?owner='+encodeURIComponent(currentUsername));
-    viewOwner=currentUsername;
+    // A browser refresh should return to the last viewed account space, even
+    // when that is a different owner's read-only space. Do not write to D1.
+    const desired=lastViewedOwner();
+    let owner=desired;
+    let latest;
+    try {
+      latest=await requestAPI('state?owner='+encodeURIComponent(owner));
+    }catch(error){
+      // A previously viewed owner may no longer be readable. Safely fall back
+      // to the signed-in account instead of preventing the user from logging in.
+      if(owner===currentUsername)throw error;
+      owner=currentUsername;
+      latest=await requestAPI('state?owner='+encodeURIComponent(owner));
+      toast('上次查看的数据空间暂不可用，已返回我的数据空间');
+    }
+    viewOwner=owner;
     cloudRevision=latest.revision;
     if(latest.state)applyCloudSnapshot(latest.state);
     else {state=defaultState();savedState=clone(state);restoreView();dirty=false;renderAll();}
+    rememberViewedOwner();
     loaded=true;lastSyncAt=Date.now();updateSaveState();updateSpaceControls();
     $('authGate').hidden=true;
   }
@@ -453,6 +471,7 @@
   async function doLogout(){
     try{await requestAPI('logout',{method:'POST',body:'{}'});}
     catch(error){toast('退出失败，请重试：'+error.message);return;}
+    clearLastViewedOwner(); // Explicit logout resets the next login to 'my space'.
     currentUsername=null;viewOwner=null;loaded=false;dirty=false;pendingRemote=null;
     state=defaultState();savedState=clone(state);cloudRevision=0;
     $('exitDialog').hidden=true;
@@ -473,6 +492,25 @@
     node.classList.add('show');
     clearTimeout(toast.timer);
     toast.timer = setTimeout(() => node.classList.remove('show'), 1500);
+  }
+
+  // The last viewed owner is UI-only state, scoped to the login account.
+  // It is never added to a business document or sent to the save API.
+  function lastViewedOwnerKey() {return 'dopamine-cloud-last-view-owner-'+currentUsername;}
+  function lastViewedOwner() {
+    if(!currentUsername)return null;
+    try {
+      const owner=localStorage.getItem(lastViewedOwnerKey());
+      return accountNames.includes(owner)?owner:currentUsername;
+    }catch{return currentUsername;}
+  }
+  function rememberViewedOwner() {
+    if(!currentUsername || !accountNames.includes(viewOwner))return;
+    try{localStorage.setItem(lastViewedOwnerKey(),viewOwner);}catch{}
+  }
+  function clearLastViewedOwner() {
+    if(!currentUsername)return;
+    try{localStorage.removeItem(lastViewedOwnerKey());}catch{}
   }
 
   // Private view preferences: changing dropdowns does not modify shared business data.
