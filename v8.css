@@ -453,7 +453,8 @@ button:disabled{cursor:not-allowed}
 #pricingView .summary-scroll {
   position: relative;
   isolation: isolate;
-  contain: paint;
+  /* overflow:auto already clips its table; nested paint containment made
+     Chrome's sticky table-header compositing needlessly fragile. */
 }
 #costView > .toolbar,
 #pricingView > .toolbar {
@@ -596,3 +597,43 @@ input:focus,select:focus,.batch-text:focus{border-color:#86a8d4;box-shadow:0 0 0
 .save-state[data-status="error"]{color:#b9364a}
 .save-state[data-status="error"]::before{background:#b9364a}
 @media(max-width:950px){.topbar .save-state{display:inline-flex;order:0;font-size:10px;max-width:180px}}
+
+
+/* V1.0.10 — Keep table headings legible while scrolling the outer document.
+   A sticky <th> is constrained by the table's own overflow scroller, so it
+   cannot remain visible when that entire scroller passes under the pinned
+   toolbar. JS shows a synchronized, read-only visual header in that case.
+   Keep the source tables' own sticky headings for internal scrolling. */
+#pricingView #productHead tr:first-child > th { top:0; }
+#pricingView #productHead tr:nth-child(2) > th { top:var(--pricing-header-first-row, 36px); }
+.floating-table-head {
+  position:fixed;
+  display:block;
+  overflow:hidden;
+  pointer-events:none;
+  z-index:43; /* below the app's sticky toolbar (44), above ordinary tables */
+  margin:0;
+  padding:0;
+  height:0;
+  min-height:0;
+  min-width:0;
+  max-width:none;
+  border:0;
+  border-radius:0;
+  box-shadow:0 3px 9px rgba(25,43,70,.11);
+  background:#f4f7fc;
+  isolation:isolate;
+  contain:paint;
+}
+.floating-table-head[hidden]{display:none!important}
+.floating-table-head table{
+  table-layout:fixed;
+  border-collapse:separate;
+  border-spacing:0;
+  margin:0;
+  max-width:none;
+}
+.floating-table-head table thead th{position:sticky!important;top:0!important}
+.floating-table-head.products-block table thead tr:nth-child(2) th{top:var(--pricing-header-first-row,36px)!important}
+.floating-table-head .rate-editor input{pointer-events:none}
+.floating-table-head .rate-editor .delete-discount{display:none}

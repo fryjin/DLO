@@ -56,7 +56,7 @@ async def main():
                 before = await page.locator(selector).evaluate(
                     """el=>({clip:getComputedStyle(el).contain,
                              scrollHeight:el.scrollHeight,clientHeight:el.clientHeight})""")
-                assert before["clip"] == "paint"
+                assert before["clip"] == "none" # native overflow clipping, no nested paint containment
                 assert before["scrollHeight"] > before["clientHeight"]
                 await page.locator(selector).evaluate("el=>el.scrollTop=500")
                 result = await page.locator(selector).evaluate(

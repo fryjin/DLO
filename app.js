@@ -716,6 +716,12 @@
       <tr>
         ${pkg.discounts.map(() => `<th class="discount-sub money-col">折扣价小计</th><th class="discount-sub profit-col">商品利润小计</th>`).join('')}
       </tr>`;
+    const headerFirstRow = $('productHead').rows[0];
+    if (headerFirstRow) {
+      // On an inactive/hidden tab this measures 0: don't override the fallback.
+      const firstRowHeight=headerFirstRow.getBoundingClientRect().height;
+      if (firstRowHeight>0) $('productTable').style.setProperty('--pricing-header-first-row', firstRowHeight+'px');
+    }
 
     if (!pkg.products.length) {
       $('productBody').innerHTML = `<tr><td class="empty-cell" colspan="${8 + pkg.discounts.length*2}">暂无产品，请点击顶部“添加产品”。</td></tr>`;
@@ -1577,6 +1583,134 @@
     }
   }
 
+  // V1.0.10 — Header visibility across both independent table scrolling and
+  // outer-page scrolling. The former uses native sticky <th>; the latter
+  // needs a read-only visual duplicate because sticky is bounded by its
+  // nearest overflow scroller. The duplicate is NEVER a source of state.
+  function setupFloatingTableHead() {
+    const mirror = document.createElement('div');
+    mirror.className = 'floating-table-head';
+    mirror.hidden = true;
+    mirror.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(mirror);
+    const entries = [
+      {view:'cost', selector:'#costView .cost-manager .table-scroll', block:'cost-manager'},
+      {view:'pricing', selector:'#pricingView .products-block .table-scroll', block:'products-block'},
+      {view:'pricing', selector:'#pricingView .fees-block .table-scroll', block:'fees-block'},
+      {view:'pricing', selector:'#pricingView .summary-block .summary-scroll', block:'summary-block'}
+    ];
+    let shownSource = null;
+    let shownKey = '';
+    let frame = 0;
+
+    function hide() {
+      mirror.hidden = true;
+      shownSource = null;
+      shownKey = '';
+    }
+
+    function measure(source) {
+      const table = source.querySelector('table');
+      const head = table?.tHead;
+      const bodyFirst = table?.tBodies[0]?.rows[0];
+      if (!head || !bodyFirst || bodyFirst.querySelector('.empty-cell')) return null;
+      const scrollerRect = source.getBoundingClientRect();
+      const tableRect = table.getBoundingClientRect();
+      const headerHeight = head.getBoundingClientRect().height;
+      const cols = [...bodyFirst.cells].map(cell=>cell.getBoundingClientRect().width);
+      if (!cols.length || !headerHeight || !tableRect.width) return null;
+      return {table,head,scrollerRect,tableRect,headerHeight,cols};
+    }
+
+    function update() {
+      frame = 0;
+      if (!loaded || document.querySelector('.auth-gate:not([hidden]), .auth-loading:not([hidden])')) {
+        hide(); return;
+      }
+      const pricing = $('pricingView').classList.contains('active');
+      const firstRow = $('productHead')?.rows[0];
+      const firstRowHeight = pricing && firstRow ? firstRow.getBoundingClientRect().height : 0;
+      if (firstRowHeight > 0) $('productTable').style.setProperty('--pricing-header-first-row',firstRowHeight+'px');
+      const view = pricing ? 'pricing' : 'cost';
+      const bar = document.querySelector('#'+view+'View > .toolbar');
+      if (!bar) {hide();return;}
+      const barBottom = bar.getBoundingClientRect().bottom;
+      // Only use the visual header when the original scrollport has already
+      // passed underneath the pinned toolbar AND table rows are still visible.
+      let selected = null;
+      for (const entry of entries) {
+        if (entry.view !== view) continue;
+        const source = document.querySelector(entry.selector);
+        if (!source) continue;
+        const m = measure(source);
+        if (!m) continue;
+        const r = m.scrollerRect;
+        if (r.top >= barBottom - 1 ||
+            r.bottom <= barBottom + m.headerHeight + 6 ||
+            m.tableRect.bottom <= barBottom + m.headerHeight + 6) continue;
+        selected = {entry,source,m};
+        break;
+      }
+      if (!selected) {hide();return;}
+      const {entry,source,m} = selected;
+      const key = entry.selector+'|'+m.tableRect.width.toFixed(2)+'|'+
+        m.cols.map(n=>n.toFixed(2)).join(',')+'|'+m.head.innerHTML;
+      if (source !== shownSource || key !== shownKey) {
+        mirror.className = 'floating-table-head '+entry.block;
+        const copy = document.createElement('table');
+        copy.className = m.table.className;
+        copy.style.width = m.tableRect.width+'px';
+        copy.style.minWidth = m.tableRect.width+'px';
+        const colgroup = document.createElement('colgroup');
+        m.cols.forEach(width=>{
+          const col = document.createElement('col');
+          col.style.width = width+'px';
+          colgroup.appendChild(col);
+        });
+        copy.appendChild(colgroup);
+        const heading = m.head.cloneNode(true);
+        heading.removeAttribute('id');
+        // The floating duplicate is purely for reading column labels. It is
+        // not a second form; editing happens in the original table header.
+        heading.querySelectorAll('input').forEach(input=>{
+          const label=document.createElement('span');
+          label.className='floating-discount-label';
+          label.textContent=input.value;
+          input.replaceWith(label);
+        });
+        heading.querySelectorAll('button').forEach(button=>button.remove());
+        copy.appendChild(heading);
+        mirror.replaceChildren(copy);
+        shownSource = source;
+        shownKey = key;
+      }
+      mirror.style.setProperty('--pricing-header-first-row',m.head.rows[0]?.getBoundingClientRect().height+'px');
+      mirror.style.top = Math.round(barBottom)+'px';
+      mirror.style.left = m.scrollerRect.left+'px';
+      mirror.style.width = m.scrollerRect.width+'px';
+      mirror.style.height = m.headerHeight+'px';
+      mirror.scrollLeft = source.scrollLeft;
+      mirror.hidden = false;
+    }
+
+    function schedule() {
+      if (!frame) frame=requestAnimationFrame(update);
+    }
+    window.addEventListener('scroll',schedule,{passive:true});
+    window.addEventListener('resize',schedule,{passive:true});
+    entries.forEach(entry=>{
+      const scroller=document.querySelector(entry.selector);
+      if (scroller) scroller.addEventListener('scroll',schedule,{passive:true});
+    });
+    const observer = new MutationObserver(schedule);
+    observer.observe($('pricingView'),{subtree:true,childList:true});
+    observer.observe($('costView'),{subtree:true,childList:true});
+    // The UI can switch between views without changing the table markup.
+    document.querySelectorAll('[data-nav],[data-view]').forEach(el=>el.addEventListener('click',schedule));
+    schedule();
+    return schedule;
+  }
+
   function enableVerticalScrollHandoff() {
     document.querySelectorAll('.table-scroll, .summary-scroll').forEach(scroller => {
       if (scroller.dataset.scrollHandoff === '1') return;
@@ -1939,6 +2073,7 @@
 
   renderAll();
   selectV8View('cost');
+  setupFloatingTableHead();
   setupAutoSave();
   $('loginForm').onsubmit = async e => {
     e.preventDefault();
