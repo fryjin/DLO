@@ -1761,9 +1761,7 @@
     document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.nav===next));
     $('pricingView').classList.toggle('active', pricing);
     $('costView').classList.toggle('active', !pricing);
-    $('viewTitle').textContent=pricing?'套餐售价计算':'产品信息设置';
-    $('breadcrumbCurrent').textContent=pricing?'售价计算':'产品管理';
-    $('viewSubtitle').textContent=pricing?'选择套餐，对比成本、折扣与最终利润。':'维护产品、组合与基础定价，成本变化自动传递到套餐。';
+    $('viewTitle').textContent=pricing?'套餐售价计算':'产品信息管理';
     window.scrollTo({top:0,behavior:'instant'});
   }
 

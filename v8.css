@@ -17,7 +17,7 @@
   --loss: #c94751;
   --sidebar-w: 226px;
   --top-h: 64px;
-  --subhead-h: 98px;
+  --subhead-h: 56px;
   color-scheme: light;
 }
 html,body{background:var(--bg)}
@@ -223,7 +223,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
   /* V1.0.5: The sticky title and toolbar are siblings, so the shared height
      must live on :root, not just .page-head. Otherwise the toolbar uses
      the old 98px value and leaves a gap where table headings show through. */
-  :root{--sidebar-w:62px;--subhead-h:88px}
+  :root{--sidebar-w:62px;--subhead-h:50px}
   .sidebar{align-items:stretch}
   .sidebar-head{justify-content:center;padding:0}
   .sidebar-brand-copy,.sidebar-collapse,.sidebar-project,.sidebar-group-label,.sidebar-bottom-copy,.nav-item span,.nav-future span{display:none}
@@ -244,7 +244,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
   .cost-name{width:130px}.cost-components{width:164px}.cost-component-qty{width:70px}.cost-spec{width:118px}.cost-value{width:98px}.cost-list-price{width:98px}.cost-profit{width:96px}.cost-status{width:70px}
 }
 @media(max-width:1200px){
-  :root{--sidebar-w:0px;--subhead-h:78px}
+  :root{--sidebar-w:0px;--subhead-h:48px}
   .sidebar{display:none}
   .topbar-brand .brand-subtitle{display:none}
   .topbar{padding:0 13px}
@@ -637,3 +637,50 @@ input:focus,select:focus,.batch-text:focus{border-color:#86a8d4;box-shadow:0 0 0
 .floating-table-head.products-block table thead tr:nth-child(2) th{top:var(--pricing-header-first-row,36px)!important}
 .floating-table-head .rate-editor input{pointer-events:none}
 .floating-table-head .rate-editor .delete-discount{display:none}
+
+/* V1.0.11 — Compact single-line breadcrumb/heading.
+   The same --subhead-h controls BOTH the sticky heading and the sticky
+   toolbar offset. Changing only .page-head height would reintroduce the
+   original header bleed-through gap. */
+.page-head {
+  height: var(--subhead-h);
+  min-height: var(--subhead-h);
+  padding: 0;
+}
+.page-head .title-row {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+  width: 100%;
+  gap: 0;
+}
+.page-head .page-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 720;
+  letter-spacing: -.02em;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.page-head .page-heading-parent {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 550;
+  letter-spacing: 0;
+}
+.page-head .page-heading-slash {
+  padding: 0 10px;
+  color: #9aa9bc;
+  font-size: 13px;
+  font-weight: 400;
+}
+@media (max-width:1200px) {
+  .page-head .page-heading {font-size: 15px}
+  .page-head .page-heading-parent,.page-head .page-heading-slash {font-size: 12px}
+}
