@@ -253,17 +253,28 @@
     // Viewed account data is read-only, including no backup export/restore.
   }
 
+  const SAVE_LABELS=Object.freeze({manual:'手动保存',auto:'自动保存',server:'上次保存',remote:'云端更新',sync:'同步完成'});
+  function formatSaveTime(time){
+    return new Date(time).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false});
+  }
+  function recordSave(time,kind){
+    lastSavedAt=Number(time) || Date.now();
+    lastSaveKind=kind;
+    updateSaveState();
+  }
   function updateSaveState(failed = false) {
     const label=$('saveState');
+    let status='neutral';
     if(isOtherSpace()) label.textContent='只读浏览 · 不会修改对方数据';
-    else if(failed) label.textContent='云端保存失败 · 请导出备份';
+    else if(failed){label.textContent='云端保存失败 · 请导出备份';status='error';}
     else if(saving) label.textContent='保存云端中…';
-    else if(dirty) label.textContent='有未保存的修改';
+    else if(dirty){label.textContent='有未保存的修改';status='dirty';}
     else if(lastSavedAt){
-      const hhmm=new Date(lastSavedAt).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false});
-      label.textContent=(lastSaveKind==='manual'?'已保存':'已自动保存')+' '+hhmm;
+      label.textContent=(SAVE_LABELS[lastSaveKind] || '上次保存')+' '+formatSaveTime(lastSavedAt);
+      status=lastSaveKind==='auto'?'auto':lastSaveKind==='manual'?'manual':'neutral';
     } else label.textContent=loaded?'云端数据已就绪':'云端连接中…';
-    label.title=isOtherSpace()?'当前只读，可以同步覆盖自己的数据。':'每5分钟自动保存自己的修改，并获取当前数据空间的最新版本。';
+    label.dataset.status=status;
+    label.title=isOtherSpace()?'当前只读，可以同步覆盖自己的数据。':'保存时间只在云端写入成功后更新；每5分钟检查更新，有修改才自动保存。';
   }
   function markDirty() {
     if(isOtherSpace()) throw new Error('只读数据空间禁止修改');
@@ -282,8 +293,8 @@
       pendingRemote=null;
       savedState=snapshot;
       if(before===changeId)dirty=false;
-      lastSavedAt=Date.now();lastSaveKind=kind;saving=false;
-      updateSaveState();
+      saving=false;
+      recordSave(response.updatedAt || Date.now(),kind);
       if(kind==='manual')toast('云端已保存');
       return true;
     }catch(error){
@@ -322,8 +333,9 @@
     if(latest.state)applyCloudSnapshot(latest.state);
     cloudRevision=latest.revision;
     pendingRemote=null;
+    if(!isOtherSpace())recordSave(latest.updatedAt || Date.now(),'remote');
+    else updateSaveState();
     toast('已获取当前账号数据的最新版本');
-    updateSaveState();
   }
   async function syncCycle() {
     if(!loaded || saving || spaceSwitching)return;
@@ -376,6 +388,7 @@
       if(latest.state)applyCloudSnapshot(latest.state);
       else {state=defaultState();savedState=clone(state);restoreView();dirty=false;renderAll();}
       lastSyncAt=Date.now();
+      if(owner===currentUsername){lastSavedAt=Number(latest.updatedAt)||0;lastSaveKind='server';}
       rememberViewedOwner(); // Commit preference only after a successful space load.
       updateSaveState();updateSpaceControls();
     }catch(error){
@@ -409,7 +422,7 @@
       pendingRemote=null;
       if(latest.state)applyCloudSnapshot(latest.state);
       else throw new Error('同步后未找到数据，请刷新页面');
-      lastSyncAt=Date.now();lastSavedAt=Date.now();lastSaveKind='manual';
+      lastSyncAt=Date.now();recordSave(latest.updatedAt || Date.now(),'sync');
       rememberViewedOwner(); // Sync returns the user to their own editable space.
       toast(`已将${accountLabel(from)}的数据覆盖同步到我的空间`);
     }catch(error){
@@ -450,6 +463,7 @@
     }
     viewOwner=owner;
     cloudRevision=latest.revision;
+    if(owner===currentUsername){lastSavedAt=Number(latest.updatedAt)||0;lastSaveKind='server';}
     if(latest.state)applyCloudSnapshot(latest.state);
     else {state=defaultState();savedState=clone(state);restoreView();dirty=false;renderAll();}
     rememberViewedOwner();
@@ -473,7 +487,7 @@
     catch(error){toast('退出失败，请重试：'+error.message);return;}
     clearLastViewedOwner(); // Explicit logout resets the next login to 'my space'.
     currentUsername=null;viewOwner=null;loaded=false;dirty=false;pendingRemote=null;
-    state=defaultState();savedState=clone(state);cloudRevision=0;
+    state=defaultState();savedState=clone(state);cloudRevision=0;lastSavedAt=0;lastSaveKind='initial';
     $('exitDialog').hidden=true;
     $('loginSecret').value='';
     $('currentUserLabel').textContent='当前账号';
