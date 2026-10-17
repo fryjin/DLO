@@ -684,3 +684,55 @@ input:focus,select:focus,.batch-text:focus{border-color:#86a8d4;box-shadow:0 0 0
   .page-head .page-heading {font-size: 15px}
   .page-head .page-heading-parent,.page-head .page-heading-slash {font-size: 12px}
 }
+
+/* Cloud Lite V1.0.12 — explicit catalog column allocation.
+   The auto table-layout previously gave the sparse '成份' column most of the
+   available width. Keep readable product names, narrow wrapped components,
+   and let long combinations grow the row height instead of clipping text. */
+#costView .cost-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 1360px;
+}
+#costView .cost-table col.cost-rank { width: 3%; }
+#costView .cost-table col.cost-name { width: 16%; }
+#costView .cost-table col.cost-components { width: 17%; }
+#costView .cost-table col.cost-component-qty { width: 7%; }
+#costView .cost-table col.cost-spec { width: 13%; }
+#costView .cost-table col.cost-value { width: 8%; }
+#costView .cost-table col.cost-price-adjustment { width: 9%; }
+#costView .cost-table col.cost-list-price { width: 8%; }
+#costView .cost-table col.cost-profit { width: 8%; }
+#costView .cost-table col.cost-status { width: 7%; }
+#costView .cost-table col.compact-action { width: 4%; }
+/* The colgroup, rather than content, determines column size even for long names. */
+#costView .cost-table th { min-width: 0; width: auto; }
+#costView .cost-table .combo-summary {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-overflow: clip;
+  overflow: visible;
+  line-height: 1.55;
+  padding: 7px 9px;
+}
+#costView .cost-table tr.catalog-row td { height: 43px; }
+#costView .cost-table td.adjustable { background: #fffafb; }
+#costView .cost-table .cost-price-adjustment-input {
+  width: calc(100% - 12px);
+  margin: 0 6px;
+  height: 33px;
+  padding: 0 9px;
+  border: 1px solid #d8e0eb;
+  border-radius: 6px;
+  background: #fff;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #344b6c;
+}
+#costView .cost-table .cost-price-adjustment-input:focus {
+  outline: 0;
+  border-color: #7294c3;
+  box-shadow: 0 0 0 2px rgba(49,95,157,.12);
+}
+#costView .cost-table th.cost-price-adjustment { white-space: nowrap; }

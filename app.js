@@ -20,6 +20,7 @@
     if (!s || s === '-' || s === '.') return 0n;
     let sign = 1n;
     if (s.startsWith('-')) { sign = -1n; s = s.slice(1); }
+    else if (s.startsWith('+')) s = s.slice(1);
     if (!/^\d*(\.\d*)?$/.test(s)) return 0n;
     let [whole = '0', frac = ''] = s.split('.');
     whole = whole || '0';
@@ -84,7 +85,9 @@
       ...item,
       type: item.type === 'combo' ? 'combo' : 'product',
       components: Array.isArray(item.components) ? item.components : [],
-      listPrice: String(item.listPrice ?? '0')
+      listPrice: String(item.listPrice ?? '0'),
+      // Optional V1.0.12 field; old Local and Cloud JSON imports default to zero.
+      priceAdjustment: item.type === 'combo' ? String(item.priceAdjustment ?? '0') : '0'
     }));
   }
 
@@ -574,20 +577,41 @@
     }, 0n);
   }
 
-  // Product prices are user-entered, while combo prices are always derived
-  // from component prices and quantities. Support nested combos; guard
-  // against corrupted legacy cycles without changing the saved schema.
-  function effectiveListPriceById(id, visiting = new Set()) {
-    const item = costItem(id);
-    if (!item) return 0n;
-    if (item.type !== 'combo') return nonNegative(item.listPrice ?? '0');
-    if (visiting.has(id)) return 0n;
+  // Every combination's adjusted unit price is fed into higher-level combos,
+  // package sales, discount values and profits without early rounding.
+  // The optional signed adjustment is expressed in CNY per ONE combo unit.
+  function comboComponentPrice(project, item, visiting = new Set()) {
     const nextVisiting = new Set(visiting);
-    nextVisiting.add(id);
+    nextVisiting.add(item.id);
     return (item.components || []).reduce((sum, component) => {
-      if (!component.costItemId || component.costItemId === id) return sum;
-      return add(sum, mul(effectiveListPriceById(component.costItemId, nextVisiting), nonNegative(component.qty)));
-    }, 0n);
+      if (!component.costItemId || nextVisiting.has(component.costItemId)) return sum;
+      return add(sum, mul(priceInProject(project,component.costItemId,nextVisiting),nonNegative(component.qty)));
+    },0n);
+  }
+  function priceInProject(project, id, visiting = new Set()) {
+    const item=project.costItems.find(x=>x.id===id);
+    if(!item || visiting.has(id)) return 0n;
+    if(item.type!=='combo') return nonNegative(item.listPrice ?? '0');
+    return add(comboComponentPrice(project,item,visiting),parseDecimal(item.priceAdjustment ?? '0'));
+  }
+  function effectiveListPriceById(id) {
+    return priceInProject(currentProject(),id);
+  }
+  function validAdjustment(value) {
+    return /^[+-]?\d+(?:\.\d{1,12})?$/.test(String(value??'').trim());
+  }
+  function projectHasNonnegativeComboPrices(project) {
+    return project.costItems.every(entry => entry.type!=='combo' ||
+      priceInProject(project,entry.id)>=0n);
+  }
+  function validateAdjustedComboPrice(project, item, value) {
+    if (!validAdjustment(value)) return false;
+    const previous=item.priceAdjustment;
+    item.priceAdjustment=value;
+    // A nested parent may also become negative when a child's price is lowered.
+    const valid=projectHasNonnegativeComboPrices(project);
+    item.priceAdjustment=previous;
+    return valid;
   }
 
   function unitCost(row) {
@@ -767,7 +791,8 @@
   // value; visible calculations still update only on Enter/blur as before.
   function stageNumericValue(el) {
     const value = el.value.trim();
-    if (!/^\d+(?:\.\d{0,12})?$/.test(value)) {
+    const signed = el.matches('.cost-price-adjustment-input');
+    if (!(signed ? /^[+-]?\d+(?:\.\d{0,12})?$/.test(value) : /^\d+(?:\.\d{0,12})?$/.test(value))) {
       markDirty();
       return;
     }
@@ -786,7 +811,14 @@
       if (item && item.type !== 'combo') item.cost = value;
     } else if (el.matches('.cost-list-price-input')) {
       const item = costItem(id);
-      if (item && item.type !== 'combo') item.listPrice = value;
+      if (item && item.type !== 'combo') {
+        const previous=item.listPrice;
+        item.listPrice=value;
+        if(!projectHasNonnegativeComboPrices(currentProject()))item.listPrice=previous;
+      }
+    } else if (el.matches('.cost-price-adjustment-input')) {
+      const combo=costItem(id);
+      if(combo?.type==='combo' && validateAdjustedComboPrice(currentProject(),combo,value))combo.priceAdjustment=value;
     } else if (el.matches('.component-qty-input')) {
       const combo = costItem(el.dataset.item);
       const component = combo?.components?.find(c => c.id === el.dataset.component);
@@ -982,7 +1014,7 @@
   function renderCostItems() {
     if (!currentProject().costItems.length) {
       $('searchCount').textContent='显示 0 / 0';
-      $('costBody').innerHTML = `<tr><td class="empty-cell" colspan="10">暂无产品信息，可添加普通产品，也可以创建由多个产品组成的组合。</td></tr>`;
+      $('costBody').innerHTML = `<tr><td class="empty-cell" colspan="11">暂无产品信息，可添加普通产品，也可以创建由多个产品组成的组合。</td></tr>`;
       return;
     }
 
@@ -994,7 +1026,7 @@
     });
     $('searchCount').textContent = `显示 ${visibleItems.length} / ${allItems.length}`;
     if (!visibleItems.length) {
-      $('costBody').innerHTML = '<tr><td class="empty-cell" colspan="10">没有符合条件的产品，可调整搜索词或筛选条件。</td></tr>';
+      $('costBody').innerHTML = '<tr><td class="empty-cell" colspan="11">没有符合条件的产品，可调整搜索词或筛选条件。</td></tr>';
       return;
     }
     $('costBody').innerHTML = visibleItems.map(({item,index}) => {
@@ -1020,9 +1052,9 @@
           <label class="combo-component-quantity">数量 <input class="component-qty-input" data-item="${item.id}" data-component="${component.id}" value="${escapeHtml(component.qty)}" inputmode="decimal" /></label>
           <button class="component-remove" data-item="${item.id}" data-component="${component.id}" title="移除成份">×</button>
         </div>`).join('');
-      const detail = isCombo && expanded ? `<tr class="combo-detail-row"><td colspan="10">
+      const detail = isCombo && expanded ? `<tr class="combo-detail-row"><td colspan="11">
         <div class="combo-detail-inner">
-          <div class="combo-detail-aside"><span class="combo-detail-caption">组合结构</span><strong>${escapeHtml(item.name)}</strong><span>组合成本及标价均按成份数量自动汇总，利润同步计算。</span></div>
+          <div class="combo-detail-aside"><span class="combo-detail-caption">组合结构</span><strong>${escapeHtml(item.name)}</strong><span>组合成本按成份汇总；组合标价可叠加正负调整值，利润及套餐价格同步计算。</span></div>
           <div class="combo-editor-list">${componentCell}<button class="component-add add-component" data-item="${item.id}">＋ 添加成份</button></div>
         </div>
       </td></tr>` : '';
@@ -1039,8 +1071,11 @@
         <td><div class="cell center small-muted">${memberCount}</div></td>
         <td><input class="cell-input cost-spec-input" data-id="${item.id}" value="${escapeHtml(item.spec)}" /></td>
         <td class="${isCombo?'auto':''}">${costCell}</td>
+        <td class="${isCombo?'adjustable':''}">${isCombo
+          ? `<input class="cell-input cost-price-adjustment-input" aria-label="${escapeHtml(item.name)} 单价调整值" data-id="${item.id}" value="${escapeHtml(item.priceAdjustment ?? '0')}" inputmode="decimal" placeholder="±0.00" title="可填写 +0.50 或 -0.50，按每组加减" />`
+          : `<div class="cell center small-muted">—</div>`}</td>
         <td class="${isCombo?'auto':''}">${isCombo
-          ? `<div class="cell" title="组合标价由成份标价 × 数量自动计算">${money(effectiveListPriceById(item.id))}</div>`
+          ? `<div class="cell" title="成份标价合计 + 单价调整值">${money(effectiveListPriceById(item.id))}</div>`
           : `<div class="inline-value"><span>¥</span><input class="cell-input cost-list-price-input" data-id="${item.id}" value="${escapeHtml(item.listPrice)}" inputmode="decimal" /></div>`}</td>
         <td class="auto"><div class="cell ${profit>=0n?'pos':'neg'}">${money(profit)}</div></td>
         <td><select class="cell-select cost-active-select" data-id="${item.id}"><option value="1" ${item.active?'selected':''}>启用</option><option value="0" ${!item.active?'selected':''}>停用</option></select></td>
@@ -1081,11 +1116,27 @@
       item.cost = el.value;
       markDirty(); renderCostItems(); renderProducts(); renderSummary();
     });
+    bindCommittedNumber('.cost-price-adjustment-input', el => {
+      const item=costItem(el.dataset.id);
+      if(!item || item.type!=='combo')return;
+      if(!validateAdjustedComboPrice(currentProject(),item,el.value)){
+        toast('请输入有效正负调整值，调整后的单品标价不能小于 0');
+        renderCostItems();return;
+      }
+      item.priceAdjustment=el.value;
+      markDirty();renderCostItems();renderProducts();renderFees();renderSummary();
+    });
     bindCommittedNumber('.cost-list-price-input', el => {
       const item = costItem(el.dataset.id);
       if (!item || item.type === 'combo') return;
       if (!validDecimal(el.value)) { toast('请输入不小于 0 的有效售价'); renderCostItems(); return; }
-      item.listPrice = el.value;
+      const previous=item.listPrice;
+      item.listPrice=el.value;
+      if(!projectHasNonnegativeComboPrices(currentProject())){
+        item.listPrice=previous;
+        toast('售价下调后存在负价组合，请先调整相关组合的单价调整值');
+        renderCostItems();return;
+      }
       markDirty(); renderCostItems(); renderProducts(); renderFees(); renderSummary();
     });
     document.querySelectorAll('.cost-active-select').forEach(el => {
@@ -1247,15 +1298,15 @@
       return rows.map(row => row.join('\t')).join('\n');
     }
 
-    const rows = [['产品品类','成份','成份数量','规格/备注','单个成本','单品标价','状态']];
+    const rows = [['产品品类','成份','成份数量','规格/备注','单个成本','单价调整值','单品标价','状态']];
     project.costItems.forEach(item => {
       if (item.type !== 'combo') {
-        rows.push([item.name,'/','/',item.spec || '',item.cost || '0',item.listPrice || '0',item.active ? '启用' : '停用']);
+        rows.push([item.name,'/','/',item.spec || '',item.cost || '0','',item.listPrice || '0',item.active ? '启用' : '停用']);
         return;
       }
       const components = item.components || [];
       if (!components.length) {
-        rows.push([item.name,'','',item.spec || '',decimalString(effectiveCostById(item.id),4),decimalString(effectiveListPriceById(item.id), 6),item.active ? '启用' : '停用']);
+        rows.push([item.name,'','',item.spec || '',decimalString(effectiveCostById(item.id),4),item.priceAdjustment??'0',decimalString(effectiveListPriceById(item.id), 6),item.active ? '启用' : '停用']);
         return;
       }
       components.forEach((component,index) => {
@@ -1266,6 +1317,7 @@
           component.qty,
           index === 0 ? (item.spec || '') : '',
           index === 0 ? decimalString(effectiveCostById(item.id),4) : '',
+          index === 0 ? (item.priceAdjustment??'0') : '',
           index === 0 ? decimalString(effectiveListPriceById(item.id), 6) : '',
           index === 0 ? (item.active ? '启用' : '停用') : ''
         ]);
@@ -1313,7 +1365,7 @@
       if (!validDecimal(quantity || '1', true)) throw new Error(`第 ${rowNumber} 行：产品数量必须大于 0`);
       if (legacyPrice !== undefined && legacyPrice !== '') {
         if (!validDecimal(legacyPrice)) throw new Error(`第 ${rowNumber} 行：单品标价不是有效数字`);
-        item.listPrice = legacyPrice;
+        if(item.type!=='combo')item.listPrice = legacyPrice;
       }
       const existing = pkg.products.find(p => p.costItemId === item.id);
       if (existing) existing.qty = quantity || '1';
@@ -1352,17 +1404,17 @@
         spec:hasPrice ? (row[3] || '') : (row[2] || ''),
         price:row[1],listPrice:hasPrice ? row[2] : '0',
         status:hasPrice ? (row[4] || '启用') : (row[3] || '启用'),
-        rowNumber:index+1
+        adjustment:'0',rowNumber:index+1
       };
     }
-    if (row.length < 6) throw new Error(`第 ${index+1} 行：产品信息请粘贴含售价的 7 列完整表，或旧版 6 列/简表`);
-    if (row.length > 7) throw new Error(`第 ${index+1} 行：产品信息列数过多`);
-    const isNew = row.length === 7;
+    if (row.length < 6) throw new Error(`第 ${index+1} 行：请粘贴新版 8 列产品表，或兼容的旧版 7/6 列及简表`);
+    if (row.length > 8) throw new Error(`第 ${index+1} 行：产品信息列数过多`);
     return {
       name:row[0] || '',ingredient:row[1] || '',qty:row[2] || '',
       spec:row[3] || '',price:row[4] || '',
-      listPrice:isNew ? (row[5] || '') : '0',
-      status:isNew ? (row[6] || '启用') : (row[5] || '启用'),rowNumber:index+1
+      adjustment:row.length===8 ? (row[5]||'0') : '0',
+      listPrice:row.length>=7 ? (row[row.length-2]||'') : '0',
+      status:row[row.length-1] || '启用',rowNumber:index+1
     };
   }
 
@@ -1391,16 +1443,17 @@
       if (hasIngredient) {
         if (!validDecimal(entry.qty || '1', true)) throw new Error(`第 ${entry.rowNumber} 行：成份数量必须大于 0`);
         const combo = {
-          id:uid('cost'),type:'combo',name,spec,cost:'0',listPrice:'0',active:enabled,components:[],
+          id:uid('cost'),type:'combo',name,spec,cost:'0',listPrice:'0',priceAdjustment:entry.adjustment||'0',active:enabled,components:[],
           pendingSpecs:[{label:ingredient,qty:entry.qty || '1',rowNumber:entry.rowNumber}]
         };
-        // Combo list prices are derived after component references are resolved.
-        // Ignore the exported calculated-price column, never treat it as an override.
+        // Exported combo list price is calculated; only the signed delta is editable.
+        if (!validAdjustment(combo.priceAdjustment)) throw new Error(`第 ${entry.rowNumber} 行：单价调整值不是有效正负数字`);
         combo.listPrice = '0';
         project.costItems.push(combo);
         pendingCombos.push(combo);
         activeCombo=combo;
       } else {
+        if(entry.adjustment && parseDecimal(entry.adjustment)!==0n) throw new Error(`第 ${entry.rowNumber} 行：普通产品不可填写单价调整值`);
         const cost = entry.price || '0';
         if (!validDecimal(cost)) throw new Error(`第 ${entry.rowNumber} 行：单个成本不是有效数字`);
         const listPrice = entry.listPrice || '0';
@@ -1431,6 +1484,10 @@
       visited.add(id);
     }
     project.costItems.forEach(item => visit(item.id));
+    for(const combo of project.costItems.filter(item=>item.type==='combo')){
+      if(!validateAdjustedComboPrice(project,combo,combo.priceAdjustment||'0'))
+        throw new Error(`组合“${combo.name}”调整后的单品标价不能小于 0`);
+    }
     return applied;
   }
 
@@ -1439,7 +1496,7 @@
     fees: [{id:'name',label:'费用名称'}, {id:'value',label:'费用数值'}, {id:'type',label:'计算方式'}],
     cost: [
       {id:'name',label:'产品品类'}, {id:'spec',label:'规格 / 备注'},
-      {id:'cost',label:'单个成本'}, {id:'listPrice',label:'单品标价'},
+      {id:'cost',label:'单个成本'}, {id:'priceAdjustment',label:'单价调整值'}, {id:'listPrice',label:'单品标价'},
       {id:'status',label:'状态'}
     ]
   };
@@ -1459,7 +1516,14 @@
           spec:'',cost:'0',listPrice:'0',active:true,components:[]});
         const item=items[i];
         if ((field==='cost' || field==='listPrice') && item.type==='combo') throw new Error(`第 ${rowNo} 行：组合成本和标价自动计算，无法粘贴覆盖`);
-        if (field==='cost' || field==='listPrice') {
+        if(field==='priceAdjustment'){
+          if(item.type!=='combo'){
+            if(val && parseDecimal(val)!==0n)throw new Error(`第 ${rowNo} 行：单价调整值只适用于组合`);
+          }else{
+            if(!validateAdjustedComboPrice(project,item,val))throw new Error(`第 ${rowNo} 行：无效调整值或调整后标价小于 0`);
+            item.priceAdjustment=val;
+          }
+        }else if (field==='cost' || field==='listPrice') {
           if (!validDecimal(val)) throw new Error(`第 ${rowNo} 行：请输入不小于 0 的有效数字`);
           item[field]=val;
         } else if (field==='status') item.active=validateStatus(val,rowNo);
@@ -1517,6 +1581,7 @@
     const data=items.map(item=>{
       if (type==='cost') {
         if (field==='cost') return item.type==='combo'?decimalString(effectiveCostById(item.id),4):item.cost;
+        if (field==='priceAdjustment') return item.type==='combo' ? (item.priceAdjustment??'0') : '';
         if (field==='listPrice') return item.type==='combo'?decimalString(effectiveListPriceById(item.id),6):item.listPrice;
         if (field==='status') return item.active?'启用':'停用';
         return String(item[field]??'');
@@ -1824,6 +1889,7 @@
       spec:'',
       cost:'0',
       listPrice:'0',
+      priceAdjustment:'0',
       active:true,
       components:first ? [{id:uid('cmp'),costItemId:first.id,qty:'1'}] : []
     });
